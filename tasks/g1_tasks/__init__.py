@@ -18,7 +18,7 @@ from . import stack_rgyblock_g1_29dof_inspire
 from . import pick_redblock_into_drawer_g1_29dof_dex1
 from . import pick_redblock_into_drawer_g1_29dof_dex3
 from . import pick_place_redblock_g1_29dof_inspire
-
+from . import pick_place_cylinder_g1_29dof_ftp
 # export all modules
 __all__ = [
         "pick_place_cylinder_g1_29dof_dex3", "pick_place_cylinder_g1_29dof_dex1", 
@@ -27,5 +27,6 @@ __all__ = [
         "stack_rgyblock_g1_29dof_inspire",
         "pick_redblock_into_drawer_g1_29dof_dex1","pick_redblock_into_drawer_g1_29dof_dex3",
         "pick_place_redblock_g1_29dof_inspire",
-        "pick_place_cylinder_g1_29dof_inspire"
+        "pick_place_cylinder_g1_29dof_inspire",
+        "pick_place_cylinder_g1_29dof_ftp"
 ]
