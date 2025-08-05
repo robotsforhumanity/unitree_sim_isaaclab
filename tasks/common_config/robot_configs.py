@@ -8,7 +8,7 @@ support different robot variants: with/without waist joint, different finger con
 
 from isaaclab.assets import ArticulationCfg
 from isaaclab.utils import configclass
-from robots.unitree import G129_CFG_WITH_DEX1_BASE_FIX,G129_CFG_WITH_DEX3_BASE_FIX, G1_CFG
+from robots.unitree import G129_CFG_WITH_DEX1_BASE_FIX,G129_CFG_WITH_DEX3_BASE_FIX, G1_CFG, G129_CFG_WITH_INSPIRE_HAND
 from typing import Optional, Dict, Tuple, Literal
 
 
@@ -83,7 +83,7 @@ class G1RobotJointTemplates:
         }
     
     @classmethod
-    def get_hand_joints(cls, hand_type: Literal["gripper", "dex3", "ftp"] = "gripper") -> Dict[str, float]:
+    def get_hand_joints(cls, hand_type: Literal["gripper", "dex3", "ftp", "inspire"] = "gripper") -> Dict[str, float]:
         """get the default position of the hand joints
         
         Args:
@@ -140,8 +140,37 @@ class G1RobotJointTemplates:
                 "right_thumb_1_joint": 0.0,
                 "right_thumb_2_joint": 0.0,
             }
+        elif hand_type == "inspire":
+            return {
+            # fingers joints
+            "L_index_proximal_joint": 0.0,
+            "L_index_intermediate_joint": 0.0,
+            "L_middle_proximal_joint": 0.0,
+            "L_middle_intermediate_joint": 0.0,
+            "L_pinky_proximal_joint":0.0,
+            "L_pinky_intermediate_joint":0.0,
+            "L_ring_proximal_joint":0.0,
+            "L_ring_intermediate_joint":0.0,
+            "L_thumb_proximal_yaw_joint":0.0,
+            "L_thumb_proximal_pitch_joint":0.0,
+            "L_thumb_intermediate_joint":0.0,
+            "L_thumb_distal_joint":0.0,
+
+            "R_index_proximal_joint": 0.0,
+            "R_index_intermediate_joint": 0.0,
+            "R_middle_proximal_joint": 0.0,
+            "R_middle_intermediate_joint": 0.0,
+            "R_pinky_proximal_joint":0.0,
+            "R_pinky_intermediate_joint":0.0,
+            "R_ring_proximal_joint":0.0,
+            "R_ring_intermediate_joint":0.0,
+            "R_thumb_proximal_yaw_joint":0.0,
+            "R_thumb_proximal_pitch_joint":0.0,
+            "R_thumb_intermediate_joint":0.0,
+            "R_thumb_distal_joint":0.0,
+            }
         else:
-            raise ValueError(f"Unsupported hand type: {hand_type}. Supported: 'gripper', 'dex3', 'ftp'")
+            raise ValueError(f"Unsupported hand type: {hand_type}. Supported: 'gripper', 'dex3', 'ftp', 'inspire'")
     
        
 
@@ -165,7 +194,7 @@ class G129dofRobotBaseCfg:
         init_pos: Tuple[float, float, float] = (-0.15, 0.0, 0.744),
         init_rot: Tuple[float, float, float, float] = (0.7071, 0, 0, 0.7071),
         include_waist: bool = True,
-        hand_type: Literal["gripper", "dex3", "ftp"] = "gripper",
+        hand_type: Literal["gripper", "dex3", "ftp", "inspire"] = "gripper",
         base_config = None,
         custom_joint_pos: Optional[Dict[str, float]] = None
     ) -> ArticulationCfg:
@@ -264,6 +293,19 @@ class G1RobotPresets:
             include_waist=False,
             hand_type="ftp",
             base_config=G1_CFG
+        )
+    
+
+    @classmethod
+    def g1_29dof_inspire_base_fix(cls,init_pos: Tuple[float, float, float] = (-0.15, 0.0, 0.76),
+        init_rot: Tuple[float, float, float, float] = (0.7071, 0, 0, 0.7071)) -> ArticulationCfg:
+        """pick-place task configuration - inspire hand"""
+        return G129dofRobotBaseCfg.get_base_config(
+            init_pos=init_pos,
+            init_rot=init_rot,
+            include_waist=False,
+            hand_type="inspire",
+            base_config=G129_CFG_WITH_INSPIRE_HAND
         )
 
 
