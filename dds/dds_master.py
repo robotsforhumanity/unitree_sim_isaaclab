@@ -68,6 +68,8 @@ class DDSManager:
         
         try:
             category, obj_name = self._parse_object_name(name)
+
+            print('Category:', category, 'Object Name:', obj_name)
             
             self.objects[name] = obj
             

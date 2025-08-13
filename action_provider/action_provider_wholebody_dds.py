@@ -36,6 +36,11 @@ class DDSWholebodyActionProvider(ActionProvider):
                 from dds.g1_robot_dds import start_g1_robot_subscriber_only
                 self.robot_dds = start_g1_robot_subscriber_only()
                 print(f"start_g1_robot_subscriber_only success")
+            elif self.enable_robot == "h1":
+                print(f"Starting H1 robot DDS subscriber...")
+                from dds.h1_robot_dds import start_h1_robot_subscriber_only
+                self.robot_dds = start_h1_robot_subscriber_only()
+                print(f"start_h1_robot_subscriber_only success")
             if self.enable_gripper:
                 from dds.gripper_dds import start_gripper_subscriber_only
                 self.gripper_dds = start_gripper_subscriber_only()
@@ -84,6 +89,26 @@ class DDSWholebodyActionProvider(ActionProvider):
                                     'right_wrist_roll_joint':26, 
                                     'right_wrist_pitch_joint':27, 
                                     'right_wrist_yaw_joint':28
+                                    }
+        elif self.enable_robot == "h1":
+            self.boy_joint_names_urdf = {'left_hip_pitch_joint':0, 
+                                    'left_hip_roll_joint':1, 
+                                    'left_hip_yaw_joint':2, 
+                                    'left_knee_joint':3, 
+                                    'left_ankle_joint':4, 
+                                    'right_hip_pitch_joint':5, 
+                                    'right_hip_roll_joint':6, 
+                                    'right_hip_yaw_joint':7, 
+                                    'right_knee_joint':8, 
+                                    'right_ankle_joint':9,  
+                                    'left_shoulder_pitch_joint':10, 
+                                    'left_shoulder_roll_joint':11, 
+                                    'left_shoulder_yaw_joint':12, 
+                                    'left_elbow_joint':13,
+                                    'right_shoulder_pitch_joint':14, 
+                                    'right_shoulder_roll_joint':15, 
+                                    'right_shoulder_yaw_joint':16, 
+                                    'right_elbow_joint':17,
                                     }
 
         if self.enable_gripper:
@@ -160,7 +185,7 @@ class DDSWholebodyActionProvider(ActionProvider):
 
             full_action = torch.zeros(len(self.all_joint_names), device=self.env.device)
             # Get robot command
-            if self.enable_robot == "g129" and self.robot_dds:
+            if (self.enable_robot == "g129" or self.enable_robot == "h1") and self.robot_dds:
                 cmd_data = self.robot_dds.get_robot_command()
                 if cmd_data and 'motor_cmd' in cmd_data:
                     positions = cmd_data['motor_cmd']['positions']

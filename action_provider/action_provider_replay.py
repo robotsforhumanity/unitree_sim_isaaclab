@@ -99,6 +99,29 @@ class FileActionProviderReplay(ActionProvider):
                 "right_wrist_yaw_joint"]
             self.left_arm_joint_indices = [self.joint_to_index[name] for name in self.left_arm_joint]
             self.right_arm_joint_indices = [self.joint_to_index[name] for name in self.right_arm_joint]
+        elif self.enable_robot == "h1":
+            self.arm_joint_mapping = {
+                "left_shoulder_pitch_joint": 0,
+                "left_shoulder_roll_joint": 1,
+                "left_shoulder_yaw_joint": 2,
+                "left_elbow_joint": 3,
+                "right_shoulder_pitch_joint": 4,
+                "right_shoulder_roll_joint": 5,
+                "right_shoulder_yaw_joint": 6,
+                "right_elbow_joint": 7
+            }
+            self.left_arm_joint = [        
+                "left_shoulder_pitch_joint",
+                "left_shoulder_roll_joint",
+                "left_shoulder_yaw_joint",
+                "left_elbow_joint"]
+            self.right_arm_joint = [        
+                "right_shoulder_pitch_joint",
+                "right_shoulder_roll_joint",
+                "right_shoulder_yaw_joint",
+                "right_elbow_joint"]
+            self.left_arm_joint_indices = [self.joint_to_index[name] for name in self.left_arm_joint]
+            self.right_arm_joint_indices = [self.joint_to_index[name] for name in self.right_arm_joint]
             
         if self.enable_gripper:
             self.gripper_joint_mapping = {
@@ -172,7 +195,7 @@ class FileActionProviderReplay(ActionProvider):
         try:
             # Get robot command
             if self.action_index < self.total_step_num:
-                if self.enable_robot == "g129":
+                if self.enable_robot == "g129" or self.enable_robot == "h1":
                     arm_cmd_data = self.robot_action[self.action_index]
      
                 # Get gripper command

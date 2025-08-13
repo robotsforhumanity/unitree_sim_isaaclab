@@ -8,7 +8,7 @@ support different robot variants: with/without waist joint, different finger con
 
 from isaaclab.assets import ArticulationCfg
 from isaaclab.utils import configclass
-from robots.unitree import G129_CFG_WITH_DEX1_BASE_FIX,G129_CFG_WITH_DEX3_BASE_FIX,G129_CFG_WITH_INSPIRE_HAND
+from robots.unitree import G129_CFG_WITH_DEX1_BASE_FIX,G129_CFG_WITH_DEX3_BASE_FIX,G129_CFG_WITH_INSPIRE_HAND, H1_CFG
 from typing import Optional, Dict, Tuple, Literal
 
 
@@ -28,16 +28,14 @@ class G1RobotJointTemplates:
             "left_hip_roll_joint": 0.0,
             "left_hip_yaw_joint": 0.0,
             "left_knee_joint": 0.0,
-            "left_ankle_pitch_joint": 0.0,
-            "left_ankle_roll_joint": 0.0,
+            "left_ankle_joint": 0.0,
             
             # right leg joint - locked in standing position
             "right_hip_pitch_joint": 0.0,
             "right_hip_roll_joint": 0.0,
             "right_hip_yaw_joint": 0.0,
             "right_knee_joint": 0.0,
-            "right_ankle_pitch_joint": 0.0,
-            "right_ankle_roll_joint": 0.0,
+            "right_ankle_joint": 0.0,
         }
     
     @classmethod
@@ -68,18 +66,12 @@ class G1RobotJointTemplates:
             "left_shoulder_roll_joint": 0.0,
             "left_shoulder_yaw_joint": 0.0,
             "left_elbow_joint": 0.0,
-            "left_wrist_roll_joint": 0.0,
-            "left_wrist_pitch_joint": 0.0,
-            "left_wrist_yaw_joint": 0.0,
             
             # right arm joint
             "right_shoulder_pitch_joint": 0.0,
             "right_shoulder_roll_joint": 0.0,
             "right_shoulder_yaw_joint": 0.0,
             "right_elbow_joint": 0.0,
-            "right_wrist_roll_joint": 0.0,
-            "right_wrist_pitch_joint": 0.0,
-            "right_wrist_yaw_joint": 0.0,
         }
     
     @classmethod
@@ -173,7 +165,7 @@ class G129dofRobotBaseCfg:
         prim_path: str = "/World/envs/env_.*/Robot",
         init_pos: Tuple[float, float, float] = (-0.15, 0.0, 0.744),
         init_rot: Tuple[float, float, float, float] = (0.7071, 0, 0, 0.7071),
-        include_waist: bool = True,
+        include_waist: bool = False,
         hand_type: Literal["gripper", "dex3", "inspire"] = "gripper",
         base_config = None,
         custom_joint_pos: Optional[Dict[str, float]] = None
@@ -273,5 +265,17 @@ class G1RobotPresets:
             include_waist=False,
             hand_type="inspire",
             base_config=G129_CFG_WITH_INSPIRE_HAND
+        )
+
+    @classmethod
+    def h1_inspire_base_fix(cls,init_pos: Tuple[float, float, float] = (-0.15, 0.0, 0.76),
+        init_rot: Tuple[float, float, float, float] = (0.7071, 0, 0, 0.7071)) -> ArticulationCfg:
+        """pick-place task configuration - inspire hand"""
+        return G129dofRobotBaseCfg.get_base_config(
+            init_pos=init_pos,
+            init_rot=init_rot,
+            include_waist=False,
+            hand_type="inspire",
+            base_config=H1_CFG
         )
 

@@ -11,6 +11,13 @@ def create_dds_objects(args_cli,env):
         dds_manager.register_object("g129", g1_robot)
         publish_names.append("g129")
         subscribe_names.append("g129")
+    elif args_cli.robot_type=="h1":
+        print('Entre dds h1')
+        from dds.h1_robot_dds import H1RobotDDS
+        h1_robot = H1RobotDDS()
+        dds_manager.register_object("h1", h1_robot)
+        publish_names.append("h1")
+        subscribe_names.append("h1")
     if args_cli.enable_dex3_dds:
         from dds.dex3_dds import Dex3DDS
         dex3 = Dex3DDS() 
@@ -51,6 +58,12 @@ def create_dds_objects_replay(args_cli,env):
         dds_manager.register_object("g129", g1_robot)
         publish_names.append("g129")
         subscribe_names.append("g129")
+    elif args_cli.robot_type=="h1":
+        from dds.h1_robot_dds import H1RobotDDS
+        h1_robot = H1RobotDDS()
+        dds_manager.register_object("h1", h1_robot)
+        publish_names.append("h1")
+        subscribe_names.append("h1")
     if args_cli.enable_dex3_dds:
         from dds.dex3_dds import Dex3DDS
         dex3 = Dex3DDS() 

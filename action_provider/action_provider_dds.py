@@ -30,6 +30,8 @@ class DDSActionProvider(ActionProvider):
         try:
             if self.enable_robot == "g129":
                 self.robot_dds = dds_manager.get_object("g129")
+            elif self.enable_robot == "h1":
+                self.robot_dds = dds_manager.get_object("h1")
             if self.enable_gripper:
                 self.gripper_dds = dds_manager.get_object("dex1")
             elif self.enable_dex3:
@@ -58,6 +60,17 @@ class DDSActionProvider(ActionProvider):
                 "right_wrist_roll_joint": 11,
                 "right_wrist_pitch_joint": 12,
                 "right_wrist_yaw_joint": 13
+            }
+        elif self.enable_robot == "h1":
+            self.arm_joint_mapping = {
+                "left_shoulder_pitch_joint": 0,
+                "left_shoulder_roll_joint": 1,
+                "left_shoulder_yaw_joint": 2,
+                "left_elbow_joint": 3,
+                "right_shoulder_pitch_joint": 4,
+                "right_shoulder_roll_joint": 5,
+                "right_shoulder_yaw_joint": 6,
+                "right_elbow_joint": 7
             }
         if self.enable_gripper:
             self.gripper_joint_mapping = {
@@ -123,7 +136,7 @@ class DDSActionProvider(ActionProvider):
 
             full_action = torch.zeros(len(self.all_joint_names), device=self.env.device)
             # Get robot command
-            if self.enable_robot == "g129" and self.robot_dds:
+            if (self.enable_robot == "g129" or self.enable_robot == "h1")and self.robot_dds:
                 cmd_data = self.robot_dds.get_robot_command()
                 if cmd_data and 'motor_cmd' in cmd_data:
                     positions = cmd_data['motor_cmd']['positions']
