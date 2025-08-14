@@ -67,7 +67,7 @@ from dds.dds_master import dds_manager
 _h1_robot_dds = None
 _dds_initialized = False
 
-def _get_g1_robot_dds_instance():
+def _get_h1_robot_dds_instance():
     """get the DDS instance, delay initialization"""
     global _h1_robot_dds, _dds_initialized
     
@@ -143,13 +143,13 @@ def get_robot_boy_joint_states(
     if enable_dds and combined_states.shape[0] > 0:
         try:
 
-            g1_robot_dds = _get_g1_robot_dds_instance()
-            if g1_robot_dds:
+            h1_robot_dds = _get_h1_robot_dds_instance()
+            if h1_robot_dds:
                 # get the IMU data for DDS
                 imu_data = get_robot_imu_data(env)
                 if imu_data.shape[0] > 0:
                     # write the robot state to shared memory
-                    g1_robot_dds.write_robot_state(
+                    h1_robot_dds.write_robot_state(
                         boy_joint_pos[0][:],  
                         boy_joint_vel[0][:],  
                         boy_joint_torque[0][:],  
