@@ -8,7 +8,7 @@ import cv2
 import zmq
 import time
 import threading
-from image_server.shared_memory_utils import MultiImageReader
+from image_server.shared_memory_utils import MultiImageReader, SharedMemoryReader
 
 
 class ImageServer:
@@ -27,6 +27,8 @@ class ImageServer:
 
         # Initialize multi-image shared memory reader
         self.multi_image_reader = MultiImageReader()
+        #self.image_depth_reader = SharedMemoryReader(shm_name="image_head_depth")
+        #self.image_segmentation_reader = SharedMemoryReader(shm_name="image_head_segmentation")
 
         # Set ZeroMQ context and socket
         self.context = zmq.Context()
@@ -93,6 +95,23 @@ class ImageServer:
 
                 # send the message
                 self.socket.send(message)
+               
+                #image_depth = self.image_depth_reader.read_image()
+                #if image_depth is not None:
+                #    # normalizar para envío
+                #    #depth_vis = cv2.normalize(image_depth, None, 0, 255, cv2.NORM_MINMAX)
+                #    ret, buffer = cv2.imencode(".png", image_depth)
+                #    jpg_bytes_depth = buffer.tobytes()
+                #    #self.socket.send(jpg_bytes_depth)
+                #    #cv2.imshow("Depth Image", d    epth_vis)
+                #
+                #image_segmentation = self.image_segmentation_reader.read_image()
+                #if image_segmentation is not None:
+                #    ret, buffer = cv2.imencode(".png", image_segmentation)
+                #    jpg_bytes_segmentation = buffer.tobytes()
+                #    #self.socket.send(jpg_bytes_segmentation)
+
+                #self.socket.send_multipart([b'FRAME', jpg_bytes, jpg_bytes_depth,  jpg_bytes_segmentation])
                 self.frame_count += 1
 
         except KeyboardInterrupt:
@@ -126,6 +145,8 @@ class ImageServer:
         # close the shared memory reader
         if hasattr(self, 'multi_image_reader'):
             self.multi_image_reader.close()
+            #self.image_depth_reader.close()
+            #self.image_segmentation_reader.close()
             
         # close the network connection
         self.socket.close()
