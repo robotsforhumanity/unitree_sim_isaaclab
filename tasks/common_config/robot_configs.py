@@ -171,7 +171,7 @@ class G129dofRobotBaseCfg:
     def get_base_config(
         cls,
         prim_path: str = "/World/envs/env_.*/Robot",
-        init_pos: Tuple[float, float, float] = (-0.15, 0.0, 0.744),
+        init_pos: Tuple[float, float, float] = (-0.15, 0.0, 0.744), #x = -0.15, z = 0.744
         init_rot: Tuple[float, float, float, float] = (0.7071, 0, 0, 0.7071),
         include_waist: bool = True,
         hand_type: Literal["gripper", "dex3", "inspire"] = "gripper",
@@ -251,7 +251,7 @@ class G1RobotPresets:
         )
     
     @classmethod
-    def g1_29dof_dex3_base_fix(cls,init_pos: Tuple[float, float, float] = (-0.15, 0.0, 0.76),
+    def g1_29dof_dex3_base_fix(cls,init_pos: Tuple[float, float, float] = (0.0, -0.55, 0.05),
         init_rot: Tuple[float, float, float, float] = (0.7071, 0, 0, 0.7071)) -> ArticulationCfg:
         """pick-place task configuration - dex3 hand"""
         return G129dofRobotBaseCfg.get_base_config(
@@ -264,7 +264,7 @@ class G1RobotPresets:
 
 
     @classmethod
-    def g1_29dof_inspire_base_fix(cls,init_pos: Tuple[float, float, float] = (-0.15, 0.0, 0.76),
+    def g1_29dof_inspire_base_fix(cls,init_pos: Tuple[float, float, float] = (0.0, -0.5, 0.0),
         init_rot: Tuple[float, float, float, float] = (0.7071, 0, 0, 0.7071)) -> ArticulationCfg:
         """pick-place task configuration - inspire hand"""
         return G129dofRobotBaseCfg.get_base_config(

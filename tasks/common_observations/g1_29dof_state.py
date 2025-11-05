@@ -17,6 +17,40 @@ if TYPE_CHECKING:
 
 
 import torch
+import rclpy
+from rclpy.node import Node
+from std_msgs.msg import Float64MultiArray
+
+_ros2_initialized = False
+_ros2_publisher = None
+
+class ArmPublisher(Node):
+    def __init__(self):
+        super().__init__('arm_publisher')
+        self.publisher_right_arm = self.create_publisher(Float64MultiArray, '/right_arm', 10)
+        self.publisher_left_arm = self.create_publisher(Float64MultiArray, '/left_arm', 10)
+
+    def publish_arm_data(self, right_val: float, left_val: float):
+        msg_r = Float64MultiArray()
+        msg_r.data = right_val
+        self.publisher_right_arm.publish(msg_r)
+
+        msg_l = Float64MultiArray()
+        msg_l.data = left_val
+        self.publisher_left_arm.publish(msg_l)
+
+
+def get_ros2_publisher():
+    global _ros2_initialized, _ros2_publisher
+    if not _ros2_initialized:
+        try:
+            rclpy.init(args=None)
+        except RuntimeError:
+            # Si ya está inicializado en otro lado, no pasa nada
+            pass
+        _ros2_publisher = ArmPublisher()
+        _ros2_initialized = True
+    return _ros2_publisher  
 
 def get_robot_boy_joint_names() -> list[str]:
     return [
@@ -146,6 +180,22 @@ def get_robot_boy_joint_states(
     # boy_joint_indices = [all_joint_names.index(name) for name in boy_joint_names]
     boy_joint_indices = [0, 3, 6, 9, 13, 17, 1, 4, 7, 10, 14, 18, 2, 5, 8, 11, 15, 19, 21, 23, 25, 27, 12, 16, 20, 22, 24, 26, 28]
 
+    indices_right_arm = [12, 16, 20, 22, 24, 26, 28]
+    indices_left_arm = [11, 15, 19, 21, 23, 25, 27]
+    obs_right_arm = []
+    obs_left_arm = []
+
+    for indice in indices_right_arm:
+        obs_right_arm.append(joint_pos[0][indice])
+    for indice in indices_left_arm:
+        obs_left_arm.append(joint_pos[0][indice])
+
+    obs_right_arm = [float(x.item()) for x in obs_right_arm]
+    obs_left_arm  = [float(x.item()) for x in obs_left_arm]
+
+    ros2_pub = get_ros2_publisher()
+    ros2_pub.publish_arm_data(obs_right_arm, obs_left_arm)       
+    
 
     # print(f"boy_joint_indices: {boy_joint_indices}")
     # extract the joint states in the specified order

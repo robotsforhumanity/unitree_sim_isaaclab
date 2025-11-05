@@ -44,6 +44,7 @@ class ObjectTableSceneCfg(TableCylinderSceneCfg):
     front_camera = CameraPresets.g1_front_camera()
     left_wrist_camera = CameraPresets.left_inspire_wrist_camera()
     right_wrist_camera = CameraPresets.right_inspire_wrist_camera()
+    perspective_camera = CameraPresets.perspective_camera()
 
 ##
 # MDP settings

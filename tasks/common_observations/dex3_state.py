@@ -14,6 +14,40 @@ if TYPE_CHECKING:
 
 
 import torch
+import rclpy
+from rclpy.node import Node
+from std_msgs.msg import Float64MultiArray
+
+_ros2_initialized = False
+_ros2_publisher = None
+
+class HandPublisher(Node):
+    def __init__(self):
+        super().__init__('hand_publisher')
+        self.publisher_right_hand = self.create_publisher(Float64MultiArray, '/right_hand', 10)
+        self.publisher_left_hand = self.create_publisher(Float64MultiArray, '/left_hand', 10)
+
+    def publish_hand_data(self, right_val: float, left_val: float):
+        msg_r = Float64MultiArray()
+        msg_r.data = right_val
+        self.publisher_right_hand.publish(msg_r)
+
+        msg_l = Float64MultiArray()
+        msg_l.data = left_val
+        self.publisher_left_hand.publish(msg_l)
+
+
+def get_ros2_publisher():
+    global _ros2_initialized, _ros2_publisher
+    if not _ros2_initialized:
+        try:
+            rclpy.init(args=None)
+        except RuntimeError:
+            # Si ya está inicializado en otro lado, no pasa nada
+            pass
+        _ros2_publisher = HandPublisher()
+        _ros2_initialized = True
+    return _ros2_publisher  
 
 def get_robot_girl_joint_names() -> list[str]:
     return [
@@ -92,6 +126,24 @@ def get_robot_dex3_joint_states(
     
     # get the gripper joint indices (last 14 joints)
     gripper_joint_indices=[31, 37, 41, 30, 36, 29, 35, 34, 40, 42, 33, 39, 32, 38]
+    indices_left_hand =  [29, 30, 31, 35, 36, 37, 41]
+    indices_right_hand = [32, 33, 34, 38, 39, 40, 42]
+
+    obs_right_hand = []
+    obs_left_hand = []
+
+    for indice in indices_right_hand:
+        obs_right_hand.append(joint_pos[0][indice])
+    for indice in indices_left_hand:
+        obs_left_hand.append(joint_pos[0][indice])
+
+    obs_right_hand = [float(x.item()) for x in obs_right_hand]
+    obs_left_hand  = [float(x.item()) for x in obs_left_hand]
+
+    ros2_pub = get_ros2_publisher()
+    ros2_pub.publish_hand_data(obs_right_hand, obs_left_hand)       
+    
+
     if len(gripper_joint_indices) == 14:
         # extract the gripper joint states in the specified order
         gripper_positions = joint_pos[:, gripper_joint_indices]

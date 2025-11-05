@@ -51,7 +51,7 @@ class CameraBaseCfg:
             CameraCfg: camera configuration
         """
         if data_types is None:
-            data_types = ["rgb", "distance_to_image_plane"]
+            data_types = ["rgb", "distance_to_image_plane", "semantic_segmentation", "depth"]
         
         return CameraCfg(
             prim_path=prim_path,
@@ -183,4 +183,21 @@ class CameraPresets:
             clipping_range=(0.1, 1.0e5),
             pos_offset=(-0.04012, 0.07441 ,0.15711),
             rot_offset=(0.00539,0.86024,0.0424, 0.50809),
-        ) 
+        )
+        
+    @classmethod
+    def perspective_camera(cls) -> CameraCfg:
+        """perspective camera configuration"""
+        return CameraBaseCfg.get_camera_config(
+            prim_path="/World/envs/env_.*/perspective_camera",
+            height=480,
+            width=640,
+            update_period=0.01,
+            data_types=["rgb", "distance_to_image_plane"],
+            focal_length=12.0,
+            focus_distance=400.0,
+            horizontal_aperture=20.0,
+            clipping_range=(0.1, 1.0e5),
+            pos_offset=(2.0, 1.1 ,0.5),
+            rot_offset=(0.0  ,0.5 ,0.5  ,-0.5),  # y = no mueve angulos de euler
+        )  
