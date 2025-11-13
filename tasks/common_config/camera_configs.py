@@ -26,7 +26,7 @@ class CameraBaseCfg:
         width: int = 640,
         focal_length: float = 7.6,
         focus_distance: float = 400.0,
-        horizontal_aperture: float = 20.0,
+        horizontal_aperture: float = 25.0,
         clipping_range: tuple = (0.1, 1.0e5),
         pos_offset: tuple = (0, 0.0, 0),
         rot_offset: tuple = (0.5, -0.5, 0.5, -0.5),
