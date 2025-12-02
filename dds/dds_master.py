@@ -52,9 +52,11 @@ class DDSManager:
             return True
         
         try:
-            ChannelFactoryInitialize(1)
+            # CRITICAL: Specify network interface for same-host inter-process communication
+            # Without this, DDS processes cannot discover each other!
+            ChannelFactoryInitialize(1, "enp39s0")
             self.dds_initialized = True
-            print("[DDSManager] DDS system initialized")
+            print("[DDSManager] DDS system initialized (domain 1, interface: enp39s0)")
             return True
         except Exception as e:
             print(f"[DDSManager] DDS system initialization failed: {e}")
