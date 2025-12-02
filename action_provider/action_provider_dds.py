@@ -3,7 +3,9 @@
 from action_provider.action_base import ActionProvider
 from typing import Optional
 import torch
+import numpy as np
 from dds.dds_master import dds_manager
+
 class DDSActionProvider(ActionProvider):
     """Action provider based on DDS"""
     
@@ -14,6 +16,7 @@ class DDSActionProvider(ActionProvider):
         self.enable_dex3 = args_cli.enable_dex3_dds
         self.enable_inspire = args_cli.enable_inspire_dds
         self.env = env
+        
         # Initialize DDS communication
         self.robot_dds = None
         self.gripper_dds = None
@@ -105,6 +108,24 @@ class DDSActionProvider(ActionProvider):
                 "L_ring_intermediate_joint":[7,1],
                 "L_thumb_intermediate_joint":[10,1.5],
                 "L_thumb_distal_joint":[10,2.4],
+                "R_index_intermediate_joint":[3,1],
+                "R_middle_intermediate_joint":[2,1],
+                "R_pinky_intermediate_joint":[0,1],
+                "R_ring_intermediate_joint":[1,1],
+                "R_thumb_intermediate_joint":[4,1.5],
+                "R_thumb_distal_joint":[4,2.4],
+            }
+        
+        # Setup joint indices for all joints
+        self.all_joint_names = self.env.scene["robot"].data.joint_names
+        self.joint_to_index = {name: i for i, name in enumerate(self.all_joint_names)}
+        self.special_joint_mapping = {
+                "L_index_intermediate_joint":[9,1],
+                "L_middle_intermediate_joint":[8,1],
+                "L_pinky_intermediate_joint":[6,1],
+                "L_ring_intermediate_joint":[7,1],
+                "L_thumb_intermediate_joint":[10,1.5],
+                "L_thumb_distal_joint":[10,2.4],
 
                 "R_index_intermediate_joint":[3,1],
                 "R_middle_intermediate_joint":[2,1],
@@ -182,6 +203,7 @@ class DDSActionProvider(ActionProvider):
                                 if joint_name in self.joint_to_index:
                                     inspire_value = inspire_cmds_positions[special_idx[0]]
                                     full_action[self.joint_to_index[joint_name]] = inspire_value * special_idx[1]
+            
             return full_action.unsqueeze(0)
             
         except Exception as e:
@@ -195,6 +217,16 @@ class DDSActionProvider(ActionProvider):
         value = max(input_min, min(input_max, value))
         return output_min + (output_max - output_min) * (value - input_min) / (input_max - input_min)
     
+    def _convert_to_gripper_range(self, value):
+        """Convert the Isaac Lab joint angle to the gripper control value"""
+        input_min = 0.03   # fully closed
+        input_max = -0.02  # fully open
+        output_min = 0.0   # fully closed
+        output_max = 5.6   # fully open
+        value = max(input_max, min(input_min, value))
+        converted_value = output_min + (output_max - output_min) * (input_min - value) / (input_min - input_max)
+        return converted_value
+    
     def cleanup(self):
         """Clean up DDS resources"""
         try:
@@ -206,5 +238,6 @@ class DDSActionProvider(ActionProvider):
                 self.dex3_dds.stop_communication()
             if self.inspire_dds:
                 self.inspire_dds.stop_communication()
+                    
         except Exception as e:
             print(f"[{self.name}] Clean up DDS resources failed: {e}")

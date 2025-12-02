@@ -23,9 +23,22 @@ def create_action_provider(env,args):
         return TrajectoryActionProvider(trajectory_gen)
     
     elif args.action_source == "policy":
-        # here can load the trained policy model
-        print("policy mode not implemented")
-        return None
+        import threading
+        import rclpy
+        from action_provider.action_provider_groot import GrootActionProvider, ActionNode
+
+        if not rclpy.ok():
+            rclpy.init()
+        action_node = ActionNode()
+
+        # Crear un executor y correrlo en thread para no bloquear tu loop principal
+        executor = rclpy.executors.SingleThreadedExecutor()
+        executor.add_node(action_node)
+        threading.Thread(target=executor.spin, daemon=True).start()
+
+        policy = GrootActionProvider(action_node)
+        return policy
+
     elif args.action_source == "replay":
         return FileActionProviderReplay(env=env,args_cli=args)
     else:

@@ -5,6 +5,7 @@ Reset pose DDS communication class
 Specialized in receiving the reset pose command
 """
 
+import time
 import threading
 from typing import Any, Dict, Optional
 from dds.dds_base import DDSObject
@@ -59,12 +60,16 @@ class ResetPoseCmdDDS(DDSObject):
     def dds_subscriber(self, msg: String_,datatype:str=None) -> Dict[str, Any]:
         """Process the subscribe data"""
         try:
+            # DEBUG: Print received message
+            print(f"🔔 [{self.node_name}] DDS CALLBACK RECEIVED: '{msg.data}'")
             cmd_data = {
-                "reset_category": msg.data
+                "reset_category": msg.data,
+                "_timestamp": time.time()
             }
             self.output_shm.write_data(cmd_data)
+            print(f"✅ [{self.node_name}] Written to shared memory: {cmd_data}")
         except Exception as e:
-            print(f"reset_pose_dds [{self.node_name}] Failed to process the subscribe data: {e}")
+            print(f"❌ reset_pose_dds [{self.node_name}] Failed to process the subscribe data: {e}")
             return {}
     
     def get_reset_pose_command(self) -> Optional[Dict[str, Any]]:
@@ -86,7 +91,8 @@ class ResetPoseCmdDDS(DDSObject):
         try:
             # prepare the reset pose data
             cmd_data = {
-                "reset_category":flag_category
+                "reset_category":flag_category,
+                "_timestamp": time.time()
             }
             
             # write the reset pose data to the shared memory
