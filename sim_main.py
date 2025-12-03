@@ -52,7 +52,7 @@ parser.add_argument("--step_hz", type=int, default=500, help="control frequency"
 parser.add_argument("--enable_profiling", action="store_true", default=True, help="enable performance analysis")
 parser.add_argument("--profile_interval", type=int, default=500, help="performance analysis report interval (steps)")
 parser.add_argument("--record_synthetic", action="store_true", default=False, help="enable synthetic data recording with Replicator")
-parser.add_argument("--max_frames", type=int, default=1000, help="maximum number of synthetic frames to capture (default: 1000)")
+parser.add_argument("--max_frames", type=int, default=0, help="maximum frames per episode (0=unlimited, controlled by STOP_REC)")
 
 
 # add AppLauncher parameters
@@ -97,62 +97,57 @@ from action_provider.create_action_provider import create_action_provider
 # Global flag for graceful shutdown
 _shutdown_requested = False
 _shutdown_count = 0
+_simulation_app_ref = None  # Global reference to close simulator on Ctrl+C
 
 def setup_signal_handlers(controller, dds_manager=None, simulation_app=None):
     """set signal handlers"""
+    global _simulation_app_ref
+    _simulation_app_ref = simulation_app
+    
     def signal_handler(signum, frame):
-        global _shutdown_requested, _shutdown_count
+        global _shutdown_requested, _shutdown_count, _simulation_app_ref
         _shutdown_count += 1
         
-        # If user presses Ctrl+C multiple times (3+), force exit immediately
-        if _shutdown_count >= 3:
-            print(f"\n⚠️  Forzando salida inmediata (Ctrl+C presionado {_shutdown_count} veces)...")
-            print("⚠️  Los videos NO se generarán")
-            
-            # Close simulation_app first to prevent it from staying open
-            if simulation_app is not None:
+        print(f"\n🛑 Ctrl+C recibido (intento {_shutdown_count}/2)", flush=True)
+        
+        # Second Ctrl+C: Force exit immediately
+        if _shutdown_count >= 2:
+            print("⚠️  Forzando salida inmediata...", flush=True)
+            # Close simulator first
+            if _simulation_app_ref is not None:
                 try:
-                    print("🔒 Cerrando Isaac Sim...")
-                    simulation_app.close()
-                    print("✓ Isaac Sim cerrado")
-                except Exception as e:
-                    print(f"⚠️  Error cerrando Isaac Sim: {e}")
-            
+                    print("🔒 Cerrando Isaac Sim...", flush=True)
+                    _simulation_app_ref.close()
+                except:
+                    pass
             import os
-            os._exit(1)
+            os._exit(0)
         
-        print(f"\n🛑 Señal recibida ({signum}), deteniendo simulación... (intento {_shutdown_count}/3)")
+        # First Ctrl+C: Graceful shutdown
+        _shutdown_requested = True
+        print("🔄 Cerrando gracefully... (presiona Ctrl+C de nuevo para forzar)", flush=True)
         
-        if _shutdown_count == 1:
+        try:
+            controller.stop()
+            print("✓ Controller detenido", flush=True)
+        except Exception as e:
+            print(f"⚠️  Error deteniendo controller: {e}", flush=True)
+        
+        try:
+            if dds_manager is not None:
+                dds_manager.stop_all_communication()
+                print("✓ DDS detenido", flush=True)
+        except Exception as e:
+            print(f"⚠️  Error deteniendo DDS: {e}", flush=True)
+        
+        # Close simulator
+        if _simulation_app_ref is not None:
             try:
-                controller.stop()
-                print("✓ Controller detenido")
+                print("🔒 Cerrando Isaac Sim...", flush=True)
+                _simulation_app_ref.close()
+                print("✓ Isaac Sim cerrado", flush=True)
             except Exception as e:
-                print(f"⚠️  Error deteniendo controller: {e}")
-            try:
-                if dds_manager is not None:
-                    dds_manager.stop_all_communication()
-                    print("✓ DDS detenido")
-            except Exception as e:
-                print(f"⚠️  Error deteniendo DDS: {e}")
-            
-            # Set flag FIRST to stop data capture immediately
-            _shutdown_requested = True
-            print("🛑 DETENIENDO CAPTURA DE DATOS SINTÉTICOS...")
-            
-            # Stop simulation app to break the main loop
-            if simulation_app is not None:
-                try:
-                    print("⏹️  Deteniendo Isaac Sim...")
-                    simulation_app.close()
-                    print("✓ Isaac Sim detenido")
-                except Exception as e:
-                    print(f"⚠️  Error deteniendo Isaac Sim: {e}")
-            
-            print("🎬 Preparando para generar videos al finalizar...")
-            print("💡 Presiona Ctrl+C dos veces más para forzar salida sin generar videos")
-        else:
-            print(f"⚠️  Presiona Ctrl+C {3 - _shutdown_count} vez(ces) más para forzar salida")
+                print(f"⚠️  Error cerrando Isaac Sim: {e}", flush=True)
     
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
@@ -234,19 +229,37 @@ def main():
     cosmos_writer = None
     render_product_ref = None  
     output_path_synthetic = None
-    recording_shm = None
-    recording_active = False  # Start with recording OFF
+    recording_active = False  # Start with recording OFF - will start when START_REC received
     frames_captured = 0  # Counter for captured frames
-    max_frames = args_cli.max_frames  # Maximum frames to capture
-    video_generated = False  # Flag to ensure video is only generated once
+    max_frames = args_cli.max_frames  # Maximum frames to capture (0 = unlimited, controlled by STOP_REC)
+    video_generated = False  # Flag to ensure video is only generated once per episode
+    episode_id = 0  # Episode counter for synchronized recording
+    last_recording_cmd = None  # Track last command to avoid duplicates
+    
+    # Initialize shared memory for recording commands (fallback to DDS)
+    recording_shm = None
+    last_shm_timestamp = 0.0  # Track last processed shared memory command timestamp
+    if args_cli.record_synthetic:
+        try:
+            from tools.recording_shm import RecordingCommandShm
+            recording_shm = RecordingCommandShm(is_writer=False)  # Simulator is the reader
+            print("✅ Shared memory para comandos de grabación inicializada (reader)")
+        except Exception as shm_err:
+            print(f"⚠️  No se pudo inicializar shared memory: {shm_err}")
+            recording_shm = None
     
     if args_cli.record_synthetic:
         print("\n" + "="*80)
-        print("🎥 INICIALIZANDO SISTEMA DE GRABACIÓN SINTÉTICA")
+        print("🎥 INICIALIZANDO SISTEMA DE GRABACIÓN SINTÉTICA SINCRONIZADA")
         print("="*80)
         print("⏳ Esto tomará ~10 segundos (solo una vez al inicio)")
-        print(f"📊 Se capturarán automáticamente {max_frames} frames")
-        print(f"📁 Datos se guardarán en: {output_path_synthetic}/clip_000")
+        print("🔄 MODO SINCRONIZADO: La grabación se controla desde teleoperación")
+        print("   - Presiona 's' en teleoperación para INICIAR grabación")
+        print("   - Presiona 's' de nuevo para DETENER y generar video")
+        if max_frames > 0:
+            print(f"📊 Límite máximo por episodio: {max_frames} frames")
+        else:
+            print("📊 Sin límite de frames (controlado por STOP_REC)")
         print("="*80 + "\n")
         
         try:
@@ -298,9 +311,16 @@ def main():
             print("\nRegistering CosmosWriter...")
             rep.WriterRegistry.register(CosmosWriter)
             
-            # Set output path to clip_000 directly
-            output_path_synthetic = os.path.abspath(os.path.join(args_cli.generate_data_dir, "synthetic_replicator", "clip_000"))
+            # Set base output path (episodes will be created as subdirectories)
+            output_path_synthetic = os.path.abspath(os.path.join(args_cli.generate_data_dir, "synthetic_replicator"))
             os.makedirs(output_path_synthetic, exist_ok=True)
+            
+            # Check for existing episodes to continue numbering
+            existing_episodes = [d for d in os.listdir(output_path_synthetic) 
+                               if d.startswith("episode_") and os.path.isdir(os.path.join(output_path_synthetic, d))]
+            if existing_episodes:
+                episode_id = max(int(ep.split("_")[1]) for ep in existing_episodes)
+                print(f"📂 Encontrados {len(existing_episodes)} episodios existentes, continuando desde {episode_id + 1}")
             
             print("Initializing DiskBackend...")
             backend = rep.backends.get("DiskBackend")
@@ -310,14 +330,14 @@ def main():
             cosmos_writer = rep.writers.get("CosmosWriter")
             cosmos_writer.initialize(backend=backend, use_instance_id=True)
             
-            # DON'T attach yet - will attach when loop starts
+            # DON'T attach yet - will attach when START_REC is received
             print("\n" + "="*80)
-            print("✅ SISTEMA DE GRABACIÓN LISTO")
+            print("✅ SISTEMA DE GRABACIÓN SINCRONIZADA LISTO")
             print("="*80)
-            print(f"📁 Datos se guardarán en: {output_path_synthetic}")
+            print(f"📁 Base de datos: {output_path_synthetic}")
             print("🎥 Capturará: RGB, Depth, Segmentación, Edges")
-            print(f"📊 Límite: {max_frames} frames")
-            print("⏸️  La grabación iniciará automáticamente con el simulador")
+            print("⏸️  ESPERANDO comando START_REC desde teleoperación...")
+            print("   (Presiona 's' en teleoperación para iniciar grabación)")
             print("="*80 + "\n")
             
         except Exception as e:
@@ -427,20 +447,21 @@ def main():
         last_loop_time = time.time()
         recent_loop_times = []  # for calculating moving average frequency
         
-        # Attach render product and start recording if synthetic data is enabled
-        if cosmos_writer and not recording_active:
-            print("\n" + "="*80)
-            print("🎬 INICIANDO GRABACIÓN SINTÉTICA")
-            print("="*80)
-            print("🔥🔥🔥 VERSION DEL CODIGO: 2025-12-01 20:43 🔥🔥🔥")  # MARKER PARA VERIFICAR VERSION
-            try:
-                cosmos_writer.attach(render_product_ref)
-                recording_active = True
-                print(f"✅ Grabación activa - capturando hasta {max_frames} frames")
-                print("="*80 + "\n")
-            except Exception as e:
-                print(f"❌ Error adjuntando render_product: {e}")
-                cosmos_writer = None
+        # Recording will start when START_REC command is received from teleoperator
+        # DO NOT auto-attach - wait for synchronized command
+        print("\n" + "="*80)
+        print("📊 ESTADO DEL SISTEMA DE GRABACIÓN")
+        print("="*80)
+        print(f"   cosmos_writer: {cosmos_writer is not None}")
+        print(f"   recording_shm: {recording_shm is not None}")
+        print(f"   record_synthetic flag: {args_cli.record_synthetic}")
+        if cosmos_writer:
+            print("🔄 MODO SINCRONIZADO ACTIVO")
+            print("   Presiona 's' en teleoperación para iniciar grabación")
+        else:
+            print("⚠️  cosmos_writer NO inicializado!")
+            print("   Asegúrate de pasar --record_synthetic al iniciar")
+        print("="*80 + "\n")
 
         # use torch.inference_mode() - removed KeyboardInterrupt suppression for graceful shutdown
         with torch.inference_mode():
@@ -464,22 +485,155 @@ def main():
                     sim_state = {"init_state":env_state_json,"task_name":args_cli.task}
                     sim_state_dds.write_sim_state_data(sim_state)
                     
-                    # Read command from DDS for scene resets
+                    # Read command from DDS for scene resets AND recording control
                     reset_pose_cmd = reset_pose_dds.get_reset_pose_command()
+                    current_category = None
                     
-                    # Process DDS commands (scene resets only, synthetic recording is continuous)
+                    # First try DDS
                     if reset_pose_cmd is not None:
-                        current_category = str(reset_pose_cmd.get("reset_category"))
+                        dds_category = str(reset_pose_cmd.get("reset_category"))
+                        # Debug: show DDS commands that are not -1
+                        if dds_category not in ['-1', 'None', '', None] and loop_count % 100 == 0:
+                            print(f"📡 [DDS] Comando recibido: '{dds_category}'", flush=True)
+                        current_category = dds_category
+                    
+                    # Fallback: Check shared memory for recording commands
+                    if recording_shm is not None:
+                        shm_cmd = recording_shm.read_command()
+                        # Debug: show what we read from shared memory periodically
+                        if loop_count % 500 == 0 and shm_cmd:
+                            print(f"📡 [SHM DEBUG] Raw: '{shm_cmd}' | DDS: '{current_category}'", flush=True)
                         
-                        # Handle scene resets
-                        if current_category == '1':
-                            print("reset object")
-                            env_cfg.event_manager.trigger("reset_object_self", env)
-                            reset_pose_dds.write_reset_pose_command(-1)
-                        elif current_category == '2':
-                            print("reset all")
-                            env_cfg.event_manager.trigger("reset_all_self", env)
-                            reset_pose_dds.write_reset_pose_command(-1)
+                        if shm_cmd and shm_cmd.strip() and current_category in [None, '-1', 'None', '']:
+                            # Format from teleop: "COMMAND|timestamp"
+                            shm_parts = shm_cmd.split('|')
+                            if len(shm_parts) >= 2:
+                                shm_category = shm_parts[0].strip()
+                                try:
+                                    shm_timestamp = float(shm_parts[1])
+                                    # Only process if this is a NEW command (timestamp > last processed)
+                                    if shm_category in ['START_REC', 'STOP_REC'] and shm_timestamp > last_shm_timestamp:
+                                        current_category = shm_category
+                                        last_shm_timestamp = shm_timestamp
+                                        print(f"📡 [SHM] Nuevo comando: '{shm_category}' (ts={shm_timestamp:.3f})", flush=True)
+                                except (ValueError, IndexError) as e:
+                                    if loop_count % 500 == 0:
+                                        print(f"⚠️  [SHM] Error parseando: {e}", flush=True)
+                    
+                    # Process commands
+                    if current_category is not None:
+                        # Debug: Show received commands periodically
+                        if loop_count % 500 == 0 and current_category not in ['-1', 'None', '']:
+                            print(f"📡 [DEBUG] Comando actual: '{current_category}' | Último: '{last_recording_cmd}' | recording={recording_active}", flush=True)
+                        
+                        # Only process meaningful commands (ignore -1 which is the "cleared" state)
+                        # Process if it's a new command different from last one
+                        if current_category not in ['-1', 'None', ''] and current_category != last_recording_cmd:
+                            print(f"📡 [CMD] Procesando comando: '{current_category}'", flush=True)
+                            last_recording_cmd = current_category
+                            
+                            # Handle START_REC - Start synchronized recording
+                            if current_category == 'START_REC':
+                                print(f"📡 [START_REC] cosmos_writer={cosmos_writer is not None}, recording_active={recording_active}", flush=True)
+                            
+                            if current_category == 'START_REC' and cosmos_writer and not recording_active:
+                                episode_id += 1
+                                episode_dir = f"episode_{episode_id:04d}"
+                                episode_path = os.path.join(output_path_synthetic, episode_dir)
+                                os.makedirs(episode_path, exist_ok=True)
+                                
+                                print("\n" + "="*80)
+                                print(f"🎬 INICIANDO GRABACIÓN - EPISODIO {episode_id}")
+                                print("="*80)
+                                print(f"📁 Guardando en: {episode_path}")
+                                
+                                try:
+                                    # Set episode output directory
+                                    cosmos_writer.set_episode_output(episode_dir)
+                                    cosmos_writer._frame_id = 0  # Reset frame counter
+                                    cosmos_writer._clip_idx = 0  # Reset clip index
+                                    cosmos_writer.attach(render_product_ref)
+                                    recording_active = True
+                                    frames_captured = 0
+                                    video_generated = False
+                                    print(f"✅ Grabación ACTIVA")
+                                    if max_frames > 0:
+                                        print(f"📊 Límite: {max_frames} frames")
+                                    else:
+                                        print("📊 Sin límite de frames (detener con 's')")
+                                    print("="*80 + "\n")
+                                except Exception as e:
+                                    print(f"❌ Error iniciando grabación: {e}")
+                                    import traceback
+                                    traceback.print_exc()
+                                
+                                reset_pose_dds.write_reset_pose_command(-1)
+                            
+                            # Handle STOP_REC - Stop recording and generate video
+                            elif current_category == 'STOP_REC':
+                                print(f"📡 [STOP_REC] cosmos_writer={cosmos_writer is not None}, recording_active={recording_active}", flush=True)
+                                should_stop = cosmos_writer and recording_active
+                                if should_stop:
+                                    print("\n" + "="*80, flush=True)
+                                    print(f"⏹️  DETENIENDO GRABACIÓN - EPISODIO {episode_id}", flush=True)
+                                    print("="*80, flush=True)
+                                    
+                                    # Mark as not recording FIRST to stop new frames
+                                    recording_active = False
+                                    frames_captured = cosmos_writer._frame_id
+                                    current_episode_id = episode_id  # Save for video generation
+                                    current_episode_path = f"{output_path_synthetic}/episode_{episode_id:04d}"
+                                    
+                                    print(f"📊 Frames capturados: {frames_captured}", flush=True)
+                                    print(f"📁 Episodio guardado en: {current_episode_path}", flush=True)
+                                    
+                                    # Generate video in background thread to not block simulation
+                                    if frames_captured > 0:
+                                        def generate_video_async(writer, ep_id, ep_path, frame_count):
+                                            try:
+                                                print(f"\n🎬 [Thread] Generando video episodio {ep_id}...", flush=True)
+                                                print(f"   ⚠️  Esto puede tardar, por favor espera...", flush=True)
+                                                
+                                                # Wait for pending I/O
+                                                time.sleep(2)
+                                                
+                                                writer.on_final_frame()
+                                                
+                                                print(f"\n✅ VIDEO GENERADO - EPISODIO {ep_id}", flush=True)
+                                                print(f"📁 Ubicación: {ep_path}", flush=True)
+                                                print(f"📊 Total frames: {frame_count}", flush=True)
+                                            except Exception as ve:
+                                                print(f"❌ Error generando video: {ve}", flush=True)
+                                                import traceback
+                                                traceback.print_exc()
+                                        
+                                        video_thread = threading.Thread(
+                                            target=generate_video_async,
+                                            args=(cosmos_writer, current_episode_id, current_episode_path, frames_captured),
+                                            daemon=True
+                                        )
+                                        video_thread.start()
+                                        print("🔄 Generación de video iniciada en background", flush=True)
+                                    else:
+                                        print("⚠️  No se capturaron frames, no hay video", flush=True)
+                                    
+                                    print("\n⏸️  Listo para siguiente episodio", flush=True)
+                                    print("   Presiona 's' en teleoperación para iniciar", flush=True)
+                                    print("="*80 + "\n", flush=True)
+                                    
+                                    reset_pose_dds.write_reset_pose_command(-1)
+                                else:
+                                    print(f"⚠️  [STOP_REC] Ignorado - recording_active={recording_active}", flush=True)
+                            
+                            # Handle scene resets
+                            elif current_category == '1':
+                                print("reset object")
+                                env_cfg.event_manager.trigger("reset_object_self", env)
+                                reset_pose_dds.write_reset_pose_command(-1)
+                            elif current_category == '2':
+                                print("reset all")
+                                env_cfg.event_manager.trigger("reset_all_self", env)
+                                reset_pose_dds.write_reset_pose_command(-1)
                 else:
                     if action_provider.get_start_loop() and data_idx<len(data_json_list):
                         print(f"data_idx: {data_idx}")
@@ -513,87 +667,57 @@ def main():
                     print(f"[LOOP {loop_count}] After controller.step()", flush=True)
                     print(f"[DEBUG] cosmos_writer={cosmos_writer is not None}, recording_active={recording_active}, shutdown={_shutdown_requested}", flush=True)
 
-                # Check synthetic data recording progress
-                # NOTE: The orchestrator runs automatically, we just monitor progress
-                if cosmos_writer and recording_active and not _shutdown_requested and not video_generated:
+                # Check synthetic data recording progress (synchronized mode)
+                if cosmos_writer and recording_active and not _shutdown_requested:
                     # Use the REAL frame count from cosmos_writer
                     actual_frames = cosmos_writer._frame_id
                     
-                    # Show progress periodically
-                    if loop_count % 50 == 0 or actual_frames % 10 == 0:
-                        print(f"📊 Progreso: {actual_frames}/{max_frames} frames ({(actual_frames/max_frames)*100:.1f}%)", flush=True)
+                    # Show progress periodically (every ~1 second at 500Hz loop)
+                    if loop_count % 500 == 0:
+                        if max_frames > 0:
+                            print(f"🎥 [Episodio {episode_id}] Grabando: {actual_frames}/{max_frames} frames ({(actual_frames/max_frames)*100:.1f}%)", flush=True)
+                        else:
+                            print(f"🎥 [Episodio {episode_id}] Grabando: {actual_frames} frames", flush=True)
                     
-                    # Check if we reached the limit
-                    if actual_frames >= max_frames: # Corre a 60 FPS
+                    # Check if we reached the limit (only if max_frames > 0)
+                    if max_frames > 0 and actual_frames >= max_frames:
                         print("\n" + "="*80, flush=True)
-                        print(f"🛑 LÍMITE ALCANZADO: {actual_frames}/{max_frames} frames", flush=True)
-                        print("⏸️  Preparando para generar video...", flush=True)
+                        print(f"🛑 LÍMITE ALCANZADO - EPISODIO {episode_id}", flush=True)
+                        print(f"📊 Frames: {actual_frames}/{max_frames}", flush=True)
                         print("="*80, flush=True)
-                        recording_active = False  # Stop monitoring
-                        frames_captured = actual_frames  # Update our counter
                         
-                        # Generate video FIRST (before stopping orchestrator)
-                        if not video_generated:
-                            print("\n🎬 GENERANDO VIDEO...", flush=True)
-                            print("="*80, flush=True)
+                        recording_active = False
+                        frames_captured = actual_frames
+                        
+                        try:
+                            # Stop the orchestrator
+                            import omni.replicator.core as rep
                             try:
-                                # Skip I/O wait - just give it a moment
-                                print("💾 Esperando 5s para que termine I/O pendiente...", flush=True)
-                                time.sleep(5)
-                                print("✓ Espera completada", flush=True)
-                                
-                                print("\n📹 Generando video (puede tardar varios minutos)...", flush=True)
-                                print("⚠️  Por favor espera, no cierres el simulador...", flush=True)
-                                cosmos_writer.on_final_frame()
-                                print("✓ on_final_frame() completado", flush=True)
-                                video_generated = True
-                                
-                                print("\n" + "="*80, flush=True)
-                                print("✅ ✅ ✅ VIDEO SINTÉTICO GENERADO EXITOSAMENTE ✅ ✅ ✅", flush=True)
-                                print(f"📁 Ubicación: {output_path_synthetic}", flush=True)
-                                print("="*80, flush=True)
-                                
-                                # NOW stop the orchestrator to prevent further captures
-                                print("\n⏸️  Deteniendo orchestrator de Replicator...", flush=True)
-                                try:
-                                    import omni.replicator.core as rep
-                                    
-                                    # Check current state
-                                    is_running_before = rep.orchestrator.get_is_started()
-                                    print(f"   Estado ANTES: orchestrator.is_started = {is_running_before}", flush=True)
-                                    
-                                    # Stop it
-                                    rep.orchestrator.stop()
-                                    
-                                    # Verify it stopped
-                                    is_running_after = rep.orchestrator.get_is_started()
-                                    print(f"   Estado DESPUÉS: orchestrator.is_started = {is_running_after}", flush=True)
-                                    
-                                    if not is_running_after:
-                                        print("✅ Orchestrator DETENIDO exitosamente", flush=True)
-                                    else:
-                                        print("⚠️  Orchestrator parece seguir activo", flush=True)
-                                        
-                                except Exception as stop_error:
-                                    print(f"❌ Error deteniendo orchestrator: {stop_error}", flush=True)
-                                    import traceback
-                                    traceback.print_exc()
-                                
-                                print("\n" + "="*80, flush=True)
-                                print("ℹ️  El simulador continuará corriendo para teleoperar.", flush=True)
-                                print("ℹ️  Los datos sintéticos YA NO se están capturando.", flush=True)
-                                print("ℹ️  Presiona Ctrl+C cuando quieras salir.", flush=True)
-                                print("="*80 + "\n", flush=True)
-                                
-                            except Exception as video_error:
-                                print(f"\n❌ ❌ ❌ ERROR GENERANDO VIDEO: {video_error}", flush=True)
-                                import traceback
-                                traceback.print_exc()
-                                print("⚠️  Intenta cerrar el simulador con Ctrl+C para intentar generar el video en el finally", flush=True)
+                                rep.orchestrator.stop()
+                                print("✓ Orchestrator detenido", flush=True)
+                            except Exception as orch_err:
+                                print(f"⚠️  Error deteniendo orchestrator: {orch_err}", flush=True)
+                            
+                            # Generate video
+                            print("\n🎬 Generando video...", flush=True)
+                            time.sleep(3)
+                            cosmos_writer.on_final_frame()
+                            video_generated = True
+                            
+                            print(f"\n✅ VIDEO GENERADO - EPISODIO {episode_id}", flush=True)
+                            print(f"📁 Ubicación: {output_path_synthetic}/episode_{episode_id:04d}", flush=True)
+                            print("\n⏸️  Listo para siguiente episodio", flush=True)
+                            print("   Presiona 's' en teleoperación para iniciar", flush=True)
+                            print("="*80 + "\n", flush=True)
+                            
+                        except Exception as video_error:
+                            print(f"\n❌ ERROR: {video_error}", flush=True)
+                            import traceback
+                            traceback.print_exc()
                 
-                # Show a message every 5 seconds if video was generated but simulator continues
-                elif video_generated and loop_count % 2500 == 0:  # ~5 seconds at 500Hz
-                    print(f"[INFO] Simulador activo (loop {loop_count}) - Datos sintéticos YA NO se están capturando", flush=True)
+                # Periodic status when not recording
+                elif cosmos_writer and not recording_active and loop_count % 5000 == 0:  # Every ~10 seconds
+                    print(f"⏸️  [Sim activo] Esperando comando de grabación... (Episodios completados: {episode_id})", flush=True)
                     
 
                 # print statistics and loop frequency periodically
@@ -649,72 +773,64 @@ def main():
         print(f"\nprogram exception: {e}")
     
     finally:
-        # Generate video BEFORE program exits (only if not already generated)
-        if cosmos_writer and not video_generated:
+        # Generate video BEFORE program exits if recording was active
+        if cosmos_writer and recording_active:
             print("\n" + "="*80)
-            print("⏹️  FINALIZANDO GRABACIÓN SINTÉTICA")
+            print(f"⏹️  FINALIZANDO GRABACIÓN - EPISODIO {episode_id}")
             print("="*80)
             
             try:
-                frame_count = frames_captured
-                print(f"📊 Total de frames capturados: {frame_count}")
+                frame_count = cosmos_writer._frame_id
+                print(f"📊 Frames capturados en episodio actual: {frame_count}")
                 
                 if frame_count > 0:
-                    # Ensure all pending I/O is flushed
-                    print("💾 Esperando que termine la escritura de frames pendientes...")
+                    print("💾 Esperando que termine la escritura...")
                     
                     try:
                         # Import replicator
                         import omni.replicator.core as rep
                         
-                        # Stop the orchestrator to prevent new captures
-                        print("   1/2: Deteniendo orchestrator...")
+                        # Stop the orchestrator
+                        print("   Deteniendo orchestrator...")
                         rep.orchestrator.stop()
                         print("   ✓ Orchestrator detenido")
                         
-                        # Wait for all pending I/O operations
-                        print("   2/2: Esperando escritura de frames (puede tardar)...")
-                        
-                        # Try to access the I/O queue directly
-                        try:
-                            backend = rep.backends.get("DiskBackend")
-                            if backend and hasattr(backend, '_io_queue'):
-                                backend._io_queue.wait_until_done()
-                                print("   ✓ Todos los frames escritos en disco")
-                            else:
-                                # Fallback: wait a reasonable time
-                                print("   ⚠️  No se puede acceder a I/O queue, esperando 15s...")
-                                time.sleep(15)
-                                print("   ✓ Espera completada")
-                        except AttributeError:
-                            # If _io_queue doesn't exist, just wait
-                            print("   ⚠️  Método de espera no disponible, esperando 15s...")
-                            time.sleep(15)
-                            print("   ✓ Espera completada")
+                        # Wait for I/O
+                        time.sleep(5)
                         
                     except Exception as flush_error:
                         print(f"⚠️  Advertencia durante flush: {flush_error}")
-                        print("   Esperando 10s adicionales por seguridad...")
-                        time.sleep(10)
+                        time.sleep(5)
                     
-                    print("\n🎬 Generando video de la sesión completa...")
-                    print("   Esto puede tardar varios minutos dependiendo del número de frames...")
-                    print("   ⚠️  NO CIERRES ESTA VENTANA, el video se está generando...")
-                    
+                    print("\n🎬 Generando video del episodio...")
                     cosmos_writer.on_final_frame()
-                    video_generated = True
                     
-                    print("\n✅ VIDEO GENERADO EXITOSAMENTE")
-                    print(f"📁 Ubicación: {output_path_synthetic}")
+                    print(f"\n✅ VIDEO GENERADO - EPISODIO {episode_id}")
+                    print(f"📁 Ubicación: {output_path_synthetic}/episode_{episode_id:04d}")
                 else:
-                    print("⚠️  No se capturaron frames, no hay video para generar")
+                    print("⚠️  No se capturaron frames en este episodio")
                     
-                print(f"={'='*80}\n")
+                print("="*80 + "\n")
             except Exception as e:
                 print(f"\n❌ ERROR GENERANDO VIDEO: {e}")
                 import traceback
                 traceback.print_exc()
-                print("\n⚠️  El video NO se generó, pero las imágenes están guardadas")
+        
+        elif cosmos_writer and episode_id > 0:
+            print("\n" + "="*80)
+            print(f"📊 RESUMEN DE SESIÓN")
+            print("="*80)
+            print(f"   Episodios completados: {episode_id}")
+            print(f"   Ubicación: {output_path_synthetic}")
+            print("="*80 + "\n")
+        
+        # Close shared memory
+        if recording_shm is not None:
+            try:
+                recording_shm.close()
+                print("✅ Shared memory cerrada")
+            except Exception as shm_close_err:
+                print(f"⚠️  Error cerrando shared memory: {shm_close_err}")
         
         # Close the simulator
         print("\n🔒 Cerrando simulador...", flush=True)
@@ -723,6 +839,11 @@ def main():
             print("✅ Simulador cerrado exitosamente", flush=True)
         except Exception as close_error:
             print(f"⚠️  Error al cerrar simulador: {close_error}", flush=True)
+        
+        # Force exit to terminate any remaining threads
+        print("\n👋 Programa finalizado.", flush=True)
+        import os
+        os._exit(0)
 
 
 # ============================================================================
