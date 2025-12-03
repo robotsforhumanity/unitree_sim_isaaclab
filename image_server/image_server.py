@@ -12,9 +12,10 @@ from image_server.shared_memory_utils import MultiImageReader, SharedMemoryReade
 
 
 class ImageServer:
-    def __init__(self, fps=30, port=5555, Unit_Test=False):
+    def __init__(self, fps=30, port=55555, Unit_Test=False):
         """
         Multi-image server - read multi-image data from shared memory and publish it
+        Port 55555 matches the default zmq_port in cam_config_server.yaml for head_camera
         """
         print("[Image Server] Initializing multi-image server from shared memory")
         
