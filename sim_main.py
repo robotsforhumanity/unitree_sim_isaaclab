@@ -99,23 +99,30 @@ _shutdown_requested = False
 _shutdown_count = 0
 
 def setup_signal_handlers(controller, dds_manager=None, simulation_app=None):
-    """set signal handlers - simplified version"""
+    """set signal handlers to properly close program and simulator"""
     
     def signal_handler(signum, frame):
         global _shutdown_requested, _shutdown_count
         _shutdown_count += 1
         
-        print(f"\n🛑 Ctrl+C recibido (intento {_shutdown_count}/3)", flush=True)
+        print(f"\n🛑 Ctrl+C recibido (intento {_shutdown_count}/2)", flush=True)
         
-        # Third Ctrl+C: Force exit IMMEDIATELY
-        if _shutdown_count >= 3:
-            print("⚠️  FORZANDO SALIDA INMEDIATA...", flush=True)
+        # Second Ctrl+C: Force immediate exit (don't wait for Isaac Sim)
+        if _shutdown_count >= 2:
+            print("⚠️  SALIENDO INMEDIATAMENTE...", flush=True)
             import os
-            os._exit(1)
+            import signal as sig
+            # Kill the entire process group (including Isaac Sim child processes)
+            try:
+                os.killpg(os.getpgrp(), sig.SIGKILL)
+            except:
+                pass
+            # Fallback if killpg fails
+            os._exit(0)
         
-        # First/Second Ctrl+C: Set flag to stop main loop gracefully
+        # First Ctrl+C: Set flag to stop main loop gracefully
         _shutdown_requested = True
-        print("🔄 Cerrando... (presiona Ctrl+C 2 veces más para forzar)", flush=True)
+        print("🔄 Cerrando gracefully... (presiona Ctrl+C de nuevo para salir INMEDIATAMENTE)", flush=True)
     
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
