@@ -397,6 +397,7 @@ class CosmosWriter(Writer):
         use_instance_id: bool = True,
         canny_threshold_low: int = 10,
         canny_threshold_high: int = 100,
+        video_fps: int = 30,  # FPS for output video (lower = slower playback)
     ):
         self._backend = backend
         self.version = __version__
@@ -430,6 +431,7 @@ class CosmosWriter(Writer):
         self._frame_id = 0
         self._clip_idx = 0
         self._frame_rate = None
+        self._video_fps = video_fps  # FPS for output video
         self._light_source = None
         self._cached_buffers = {}
         # Manage per-episode folders
@@ -663,6 +665,8 @@ class CosmosWriter(Writer):
         self._frame_id += 1
 
     def on_final_frame(self):
+        import subprocess  # Import at function start to avoid scope issues
+        
         if self._frame_id == 0:
             return
 
@@ -674,7 +678,7 @@ class CosmosWriter(Writer):
         if self._episode_subdir:
             output_dir = os.path.join(output_dir, self._episode_subdir)
         clip_dir = f"{output_dir}/clip_{self._clip_idx:04}"
-        fps = self._frame_rate if self._frame_rate else 30.0
+        fps = self._video_fps  # Use configured video FPS (default 15)
         
         print(f"[CosmosWriter] Finalizing clip {self._clip_idx} with {self._frame_id} frames at {fps} FPS...")
 
@@ -702,8 +706,6 @@ class CosmosWriter(Writer):
         # Fallback to FFmpeg if NVIDIA encoding failed
         if not encoding_success:
             print("[CosmosWriter] Attempting fallback to FFmpeg...")
-            import subprocess
-            import os
             
             # Check if ffmpeg is installed
             try:
