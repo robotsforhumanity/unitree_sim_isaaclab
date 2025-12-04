@@ -97,57 +97,25 @@ from action_provider.create_action_provider import create_action_provider
 # Global flag for graceful shutdown
 _shutdown_requested = False
 _shutdown_count = 0
-_simulation_app_ref = None  # Global reference to close simulator on Ctrl+C
 
 def setup_signal_handlers(controller, dds_manager=None, simulation_app=None):
-    """set signal handlers"""
-    global _simulation_app_ref
-    _simulation_app_ref = simulation_app
+    """set signal handlers - simplified version"""
     
     def signal_handler(signum, frame):
-        global _shutdown_requested, _shutdown_count, _simulation_app_ref
+        global _shutdown_requested, _shutdown_count
         _shutdown_count += 1
         
-        print(f"\n🛑 Ctrl+C recibido (intento {_shutdown_count}/2)", flush=True)
+        print(f"\n🛑 Ctrl+C recibido (intento {_shutdown_count}/3)", flush=True)
         
-        # Second Ctrl+C: Force exit immediately
-        if _shutdown_count >= 2:
-            print("⚠️  Forzando salida inmediata...", flush=True)
-            # Close simulator first
-            if _simulation_app_ref is not None:
-                try:
-                    print("🔒 Cerrando Isaac Sim...", flush=True)
-                    _simulation_app_ref.close()
-                except:
-                    pass
+        # Third Ctrl+C: Force exit IMMEDIATELY
+        if _shutdown_count >= 3:
+            print("⚠️  FORZANDO SALIDA INMEDIATA...", flush=True)
             import os
-            os._exit(0)
+            os._exit(1)
         
-        # First Ctrl+C: Graceful shutdown
+        # First/Second Ctrl+C: Set flag to stop main loop gracefully
         _shutdown_requested = True
-        print("🔄 Cerrando gracefully... (presiona Ctrl+C de nuevo para forzar)", flush=True)
-        
-        try:
-            controller.stop()
-            print("✓ Controller detenido", flush=True)
-        except Exception as e:
-            print(f"⚠️  Error deteniendo controller: {e}", flush=True)
-        
-        try:
-            if dds_manager is not None:
-                dds_manager.stop_all_communication()
-                print("✓ DDS detenido", flush=True)
-        except Exception as e:
-            print(f"⚠️  Error deteniendo DDS: {e}", flush=True)
-        
-        # Close simulator
-        if _simulation_app_ref is not None:
-            try:
-                print("🔒 Cerrando Isaac Sim...", flush=True)
-                _simulation_app_ref.close()
-                print("✓ Isaac Sim cerrado", flush=True)
-            except Exception as e:
-                print(f"⚠️  Error cerrando Isaac Sim: {e}", flush=True)
+        print("🔄 Cerrando... (presiona Ctrl+C 2 veces más para forzar)", flush=True)
     
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
@@ -512,10 +480,13 @@ def main():
                                 try:
                                     shm_timestamp = float(shm_parts[1])
                                     # Only process if this is a NEW command (timestamp > last processed)
-                                    if shm_category in ['START_REC', 'STOP_REC'] and shm_timestamp > last_shm_timestamp:
-                                        current_category = shm_category
-                                        last_shm_timestamp = shm_timestamp
-                                        print(f"📡 [SHM] Nuevo comando: '{shm_category}' (ts={shm_timestamp:.3f})", flush=True)
+                                    if shm_category in ['START_REC', 'STOP_REC']:
+                                        if shm_timestamp > last_shm_timestamp:
+                                            current_category = shm_category
+                                            last_shm_timestamp = shm_timestamp
+                                            print(f"📡 [SHM] Nuevo comando: '{shm_category}' (ts={shm_timestamp:.3f}, last_ts={last_shm_timestamp:.3f})", flush=True)
+                                        elif loop_count % 500 == 0:
+                                            print(f"📡 [SHM] Comando ignorado (timestamp viejo): '{shm_category}' (ts={shm_timestamp:.3f} <= last={last_shm_timestamp:.3f})", flush=True)
                                 except (ValueError, IndexError) as e:
                                     if loop_count % 500 == 0:
                                         print(f"⚠️  [SHM] Error parseando: {e}", flush=True)
@@ -529,12 +500,12 @@ def main():
                         # Only process meaningful commands (ignore -1 which is the "cleared" state)
                         # Process if it's a new command different from last one
                         if current_category not in ['-1', 'None', ''] and current_category != last_recording_cmd:
-                            print(f"📡 [CMD] Procesando comando: '{current_category}'", flush=True)
+                            print(f"📡 [CMD] Procesando comando: '{current_category}' | Último: '{last_recording_cmd}'", flush=True)
                             last_recording_cmd = current_category
                             
                             # Handle START_REC - Start synchronized recording
                             if current_category == 'START_REC':
-                                print(f"📡 [START_REC] cosmos_writer={cosmos_writer is not None}, recording_active={recording_active}", flush=True)
+                                print(f"📡 [START_REC] cosmos_writer={cosmos_writer is not None}, recording_active={recording_active}, episode={episode_id}", flush=True)
                             
                             if current_category == 'START_REC' and cosmos_writer and not recording_active:
                                 episode_id += 1
@@ -571,8 +542,9 @@ def main():
                             
                             # Handle STOP_REC - Stop recording and generate video
                             elif current_category == 'STOP_REC':
-                                print(f"📡 [STOP_REC] cosmos_writer={cosmos_writer is not None}, recording_active={recording_active}", flush=True)
+                                print(f"📡 [STOP_REC RECEIVED] Episode={episode_id}, cosmos_writer={cosmos_writer is not None}, recording_active={recording_active}, frames={cosmos_writer._frame_id if cosmos_writer else 0}", flush=True)
                                 should_stop = cosmos_writer and recording_active
+                                print(f"📡 [STOP_REC] should_stop={should_stop}", flush=True)
                                 if should_stop:
                                     print("\n" + "="*80, flush=True)
                                     print(f"⏹️  DETENIENDO GRABACIÓN - EPISODIO {episode_id}", flush=True)
@@ -587,33 +559,25 @@ def main():
                                     print(f"📊 Frames capturados: {frames_captured}", flush=True)
                                     print(f"📁 Episodio guardado en: {current_episode_path}", flush=True)
                                     
-                                    # Generate video in background thread to not block simulation
+                                    # Generate video SYNCHRONOUSLY (no thread) to ensure it completes
                                     if frames_captured > 0:
-                                        def generate_video_async(writer, ep_id, ep_path, frame_count):
-                                            try:
-                                                print(f"\n🎬 [Thread] Generando video episodio {ep_id}...", flush=True)
-                                                print(f"   ⚠️  Esto puede tardar, por favor espera...", flush=True)
-                                                
-                                                # Wait for pending I/O
-                                                time.sleep(2)
-                                                
-                                                writer.on_final_frame()
-                                                
-                                                print(f"\n✅ VIDEO GENERADO - EPISODIO {ep_id}", flush=True)
-                                                print(f"📁 Ubicación: {ep_path}", flush=True)
-                                                print(f"📊 Total frames: {frame_count}", flush=True)
-                                            except Exception as ve:
-                                                print(f"❌ Error generando video: {ve}", flush=True)
-                                                import traceback
-                                                traceback.print_exc()
-                                        
-                                        video_thread = threading.Thread(
-                                            target=generate_video_async,
-                                            args=(cosmos_writer, current_episode_id, current_episode_path, frames_captured),
-                                            daemon=True
-                                        )
-                                        video_thread.start()
-                                        print("🔄 Generación de video iniciada en background", flush=True)
+                                        try:
+                                            print(f"\n🎬 Generando video episodio {current_episode_id}...", flush=True)
+                                            print(f"   ⚠️  Esto puede tardar ~5 segundos...", flush=True)
+                                            
+                                            # Wait for pending I/O
+                                            time.sleep(1)
+                                            
+                                            # Generate video synchronously
+                                            cosmos_writer.on_final_frame()
+                                            
+                                            print(f"\n✅ VIDEO GENERADO - EPISODIO {current_episode_id}", flush=True)
+                                            print(f"📁 Ubicación: {current_episode_path}", flush=True)
+                                            print(f"📊 Total frames: {frames_captured}", flush=True)
+                                        except Exception as ve:
+                                            print(f"❌ Error generando video: {ve}", flush=True)
+                                            import traceback
+                                            traceback.print_exc()
                                     else:
                                         print("⚠️  No se capturaron frames, no hay video", flush=True)
                                     
@@ -634,6 +598,10 @@ def main():
                                 print("reset all")
                                 env_cfg.event_manager.trigger("reset_all_self", env)
                                 reset_pose_dds.write_reset_pose_command(-1)
+                            
+                            # Reset current_category AFTER processing to allow reading next SHM command
+                            current_category = None
+                            print(f"📡 [DEBUG] Comando procesado, reseteando para leer siguiente", flush=True)
                 else:
                     if action_provider.get_start_loop() and data_idx<len(data_json_list):
                         print(f"data_idx: {data_idx}")
@@ -840,10 +808,7 @@ def main():
         except Exception as close_error:
             print(f"⚠️  Error al cerrar simulador: {close_error}", flush=True)
         
-        # Force exit to terminate any remaining threads
-        print("\n👋 Programa finalizado.", flush=True)
-        import os
-        os._exit(0)
+        print("👋 Programa finalizado.", flush=True)
 
 
 # ============================================================================
