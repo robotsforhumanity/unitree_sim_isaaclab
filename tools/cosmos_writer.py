@@ -666,13 +666,20 @@ class CosmosWriter(Writer):
 
     def on_final_frame(self):
         import subprocess  # Import at function start to avoid scope issues
+        import sys
         
         if self._frame_id == 0:
+            print(f"[CosmosWriter] on_final_frame() called but _frame_id=0, skipping")
             return
 
-        print(f"[CosmosWriter] Esperando a que terminen de escribirse las imágenes...")
+        print(f"[CosmosWriter] on_final_frame() iniciado para {self._frame_id} frames", flush=True)
+        print(f"[CosmosWriter] Esperando a que terminen de escribirse las imágenes...", flush=True)
+        sys.stdout.flush()
+        
         io_queue.wait_until_done()
-        print(f"[CosmosWriter] Imágenes escritas, generando videos...")
+        
+        print(f"[CosmosWriter] ✓ Imágenes escritas, generando videos...", flush=True)
+        sys.stdout.flush()
         
         output_dir = self._base_output_dir
         if self._episode_subdir:
@@ -680,7 +687,9 @@ class CosmosWriter(Writer):
         clip_dir = f"{output_dir}/clip_{self._clip_idx:04}"
         fps = self._video_fps  # Use configured video FPS (default 15)
         
-        print(f"[CosmosWriter] Finalizing clip {self._clip_idx} with {self._frame_id} frames at {fps} FPS...")
+        print(f"[CosmosWriter] Finalizing clip {self._clip_idx} with {self._frame_id} frames at {fps} FPS...", flush=True)
+        print(f"[CosmosWriter] Clip dir: {clip_dir}", flush=True)
+        sys.stdout.flush()
 
         # Try NVIDIA Video Encoding first
         encoding_success = False
