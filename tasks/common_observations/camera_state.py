@@ -36,7 +36,8 @@ def get_camera_image(
     """
     # get the camera images
     images = {}
-    # env.sim.render()
+    # Render the simulation to update camera images
+    env.sim.render()
     
     # Head camera (front camera)
     if "front_camera" in env.scene.keys():
@@ -44,14 +45,14 @@ def get_camera_image(
         images["head"] = head_image.cpu().numpy()
     
     # Left camera (left wrist camera)
-    if "left_wrist_camera" in env.scene.keys():
-        left_image = env.scene["left_wrist_camera"].data.output["rgb"][0]
-        images["left"] = left_image.cpu().numpy()
+    #if "left_wrist_camera" in env.scene.keys():
+    #    left_image = env.scene["left_wrist_camera"].data.output["rgb"][0]
+    #    images["left"] = left_image.cpu().numpy()
     
     # Right camera (right wrist camera)  
-    if "right_wrist_camera" in env.scene.keys():
-        right_image = env.scene["right_wrist_camera"].data.output["rgb"][0]
-        images["right"] = right_image.cpu().numpy()
+    #if "right_wrist_camera" in env.scene.keys():
+    #    right_image = env.scene["right_wrist_camera"].data.output["rgb"][0]
+    #    images["right"] = right_image.cpu().numpy()
     
     # if no camera with the specified name is found, try other common camera names
     if not images:
@@ -65,10 +66,10 @@ def get_camera_image(
             
             if i == 0:
                 images["head"] = camera_image.cpu().numpy()
-            elif i == 1:
-                images["left"] = camera_image.cpu().numpy()
-            elif i == 2:
-                images["right"] = camera_image.cpu().numpy()
+            #elif i == 1:
+            #    images["left"] = camera_image.cpu().numpy()
+            #elif i == 2:
+            #    images["right"] = camera_image.cpu().numpy()
     
     # write the multi-image data to shared memory
     if images:

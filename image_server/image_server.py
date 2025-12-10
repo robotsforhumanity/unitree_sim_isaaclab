@@ -63,28 +63,24 @@ class ImageServer:
             print(f"[Image Server] Real-time FPS: {real_time_fps:.2f}, Total frames sent: {self.frame_count}, Elapsed time: {elapsed_time:.2f} sec")
 
     def send_process(self):
-        """Read the concatenated images from shared memory and send them"""
+        """Read the concatenated images from shared memory and send only the head image"""
         print("[Image Server] Starting send_process from shared memory...")
         
         try:
             while True:
-                # read the concatenated images from shared memory
-                concatenated_image = self.multi_image_reader.read_concatenated_image()
+                # read the images from shared memory (this splits them)
+                images = self.multi_image_reader.read_images()
                 
-                if concatenated_image is None:
+                if images is None or 'head' not in images:
                     # if there is no image data, wait a moment and try again
                     time.sleep(0.01)
                     continue
                 
-                # show the concatenated images
-                # cv2.imshow('Concatenated Images (Head + Left + Right)', concatenated_image)
-                # key = cv2.waitKey(1) & 0xFF
-                # if key == ord('q') or key == 27:  # 'q' 或 ESC 键退出
-                #     print("[Image Server] User pressed quit key")
-                #     break
+                # Extract only the head image (640px width)
+                head_image = images['head']
                 
-                # encode the images
-                ret, buffer = cv2.imencode('.jpg', concatenated_image)
+                # encode the head image
+                ret, buffer = cv2.imencode('.jpg', head_image)
                 if not ret:
                     print("[Image Server] Frame imencode is failed.")
                     continue
