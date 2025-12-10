@@ -92,7 +92,46 @@ class TableCylinderSceneCfg(InteractiveSceneCfg): # inherit from the interactive
             ),
         ),
     )
+
+    #apple = RigidObjectCfg(
+    #    prim_path="/World/envs/env_.*/apple",    # object in the scene
+    #    init_state=RigidObjectCfg.InitialStateCfg(pos=[-0.2, 0.0, 0.1], # initial position (pos) 
+    #                                              rot=[0, 0, 0, 1]), # initial rotation (rot)
+    #   spawn=UsdFileCfg(
+    #        usd_path="/home/ubuntu/Robots_For_Humanity/unitree_sim_isaaclab/tasks/common_scene/Apple/scene.usdc",
+    #        scale=[0.0005,0.0005,0.0005],
+    #        rigid_props=sim_utils.RigidBodyPropertiesCfg(),    # rigid body properties configuration (rigid_props)
+    #        mass_props=sim_utils.MassPropertiesCfg(mass=0.4),    # mass properties configuration (mass)
+    #        collision_props=sim_utils.CollisionPropertiesCfg(),    # collision properties configuration (collision_props)
+    #    ),
+    #)
+
+    #plate = RigidObjectCfg(
+    #    prim_path="/World/envs/env_.*/plate",    # object in the scene
+    #    init_state=RigidObjectCfg.InitialStateCfg(pos=[0.0, -0.2, 0.05], # initial position (pos) 
+    #                                              rot=[0.707, 0.707, 0.0, 0.0]), # initial rotation (rot)
+    #   spawn=UsdFileCfg(
+    #        usd_path="/home/ubuntu/Robots_For_Humanity/unitree_sim_isaaclab/tasks/common_scene/Plate_white/scene.usdc",
+    #        scale=[0.005,0.005,0.005],
+    #        rigid_props=sim_utils.RigidBodyPropertiesCfg(),    # rigid body properties configuration (rigid_props)
+    #        mass_props=sim_utils.MassPropertiesCfg(mass=0.4),    # mass properties configuration (mass)
+    #        collision_props=sim_utils.CollisionPropertiesCfg(),    # collision properties configuration (collision_props)
+    #    ),
+    #)
     
+
+    #object = RigidObjectCfg(
+    #    prim_path="/World/envs/env_.*/object1",    # object in the scene
+    #    init_state=RigidObjectCfg.InitialStateCfg(pos=[-0.18, -0.15, 0.0], # initial position (pos)
+    #                                              rot=[1, 0, 0, 0]), # initial rotation (rot)
+    #    spawn=UsdFileCfg(
+    #        usd_path="/home/ubuntu/Robots_For_Humanity/unitree_sim_isaaclab/tasks/common_scene/valvula/new_valvula.usd",
+    #        scale=[0.5,0.5,0.5],
+    #        rigid_props=sim_utils.RigidBodyPropertiesCfg(),    # rigid body properties configuration (rigid_props)
+    #        mass_props=sim_utils.MassPropertiesCfg(mass=0.4),    # mass properties configuration (mass)
+    #        collision_props=sim_utils.CollisionPropertiesCfg(),    # collision properties configuration (collision_props)
+    #    ),
+    #)
 
     valvula_joint = ArticulationCfg(
         prim_path="/World/envs/env_.*/valvulaJoint",  # debe apuntar al root del Articulation
