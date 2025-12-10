@@ -29,7 +29,7 @@ class CameraBaseCfg:
         horizontal_aperture: float = 20.0,
         clipping_range: tuple = (0.1, 1.0e5),
         pos_offset: tuple = (0, 0.0, 0),
-        rot_offset: tuple = (0.5, -0.5, 0.5, -0.5),
+        rot_offset: tuple = (0.4993, -0.5007, 0.4993, -0.5007),#(0.5, -0.5, 0.5, -0.5),
         data_types: list = None
     ) -> CameraCfg:
         """get the front camera configuration
