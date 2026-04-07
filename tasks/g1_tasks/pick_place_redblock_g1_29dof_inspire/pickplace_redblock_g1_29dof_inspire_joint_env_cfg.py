@@ -102,13 +102,13 @@ class EventCfg:
         params={
             # position range parameter
             "pose_range": {
-                "x": [-0.05, 0.05],  # x axis position range: -0.05 to 0.0 meter
-                "y": [-0.05, 0.05],   # y axis position range: 0.0 to 0.05 meter
+                "x": [0.0, 0.0],  # x axis position range: -0.05 to 0.0 meter
+                "y": [0.0, 0.0],   # y axis position range: 0.0 to 0.05 meter
             },
             # speed range parameter (empty dictionary means using default value)
             "velocity_range": {},
             # specify the object to reset
-            "asset_cfg": SceneEntityCfg("object"),
+            "asset_cfg": SceneEntityCfg("bottle"),
         },
     )
 

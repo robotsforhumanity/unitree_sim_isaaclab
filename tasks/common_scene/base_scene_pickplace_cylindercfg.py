@@ -93,18 +93,20 @@ class TableCylinderSceneCfg(InteractiveSceneCfg): # inherit from the interactive
         ),
     )
 
-    #apple = RigidObjectCfg(
-    #    prim_path="/World/envs/env_.*/apple",    # object in the scene
-    #    init_state=RigidObjectCfg.InitialStateCfg(pos=[-0.2, 0.0, 0.1], # initial position (pos) 
-    #                                              rot=[0, 0, 0, 1]), # initial rotation (rot)
-    #   spawn=UsdFileCfg(
-    #        usd_path="/home/ubuntu/Robots_For_Humanity/unitree_sim_isaaclab/tasks/common_scene/Apple/scene.usdc",
-    #        scale=[0.0005,0.0005,0.0005],
-    #        rigid_props=sim_utils.RigidBodyPropertiesCfg(),    # rigid body properties configuration (rigid_props)
-    #        mass_props=sim_utils.MassPropertiesCfg(mass=0.4),    # mass properties configuration (mass)
-    #        collision_props=sim_utils.CollisionPropertiesCfg(),    # collision properties configuration (collision_props)
-    #    ),
-    #)
+    bottle = RigidObjectCfg(
+        prim_path="/World/envs/env_.*/bottle",    # object in the scene
+        init_state=RigidObjectCfg.InitialStateCfg(pos=[0.0, 0.0, 0.0], # initial position (pos) 
+                                                  rot=[1, 0, 0, 0]), # initial rotation (rot)
+       spawn=UsdFileCfg(
+            usd_path="/home/ubuntu/Robots_For_Humanity/unitree_sim_isaaclab/tasks/common_scene/bottle.usdc",
+            scale=[0.04,0.04,0.04],
+            rigid_props=sim_utils.RigidBodyPropertiesCfg(rigid_body_enabled=True),    # rigid body properties configuration (rigid_props)
+            mass_props=sim_utils.MassPropertiesCfg(mass=0.1),    # mass properties configuration (mass)
+            collision_props=sim_utils.CollisionPropertiesCfg(collision_enabled=True),
+            
+        )   
+    )
+    
 
     #plate = RigidObjectCfg(
     #    prim_path="/World/envs/env_.*/plate",    # object in the scene
@@ -133,34 +135,34 @@ class TableCylinderSceneCfg(InteractiveSceneCfg): # inherit from the interactive
     #    ),
     #)
 
-    valvula_joint = ArticulationCfg(
-        prim_path="/World/envs/env_.*/valvulaJoint",  # debe apuntar al root del Articulation
-        init_state=ArticulationCfg.InitialStateCfg(
-            pos=[0.0, 0.0, 0.05],  # posición inicial
-            rot=[1, 0, 0, 0],
-            joint_pos={"RevoluteJoint": 0.0},
-            joint_vel ={"RevoluteJoint": 0.0},
-        ),
-        spawn=UsdFileCfg(
-            usd_path="/home/ubuntu/Robots_For_Humanity/unitree_sim_isaaclab/tasks/common_scene/valvula/new_valvula.usd",
-            scale=[0.02, 0.02, 0.02],
-            mass_props=sim_utils.MassPropertiesCfg(
-                mass=0.5,                  # masa de la rueda
-            ),
-            collision_props=sim_utils.CollisionPropertiesCfg(),
-            rigid_props=sim_utils.RigidBodyPropertiesCfg(),
-        ),
-        actuators={
-        'valvula': ImplicitActuatorCfg(
-            joint_names_expr=['RevoluteJoint'],  # todos los joints de la articulación
-            effort_limit=None,
-            velocity_limit=None,
-            stiffness={'RevoluteJoint': 0.0},
-            damping={'RevoluteJoint': 0.0},
-            #armature={'RevoluteJoint': 0.0},
-        )
-     }
-    )
+    #valvula_joint = ArticulationCfg(
+    #    prim_path="/World/envs/env_.*/valvulaJoint",  # debe apuntar al root del Articulation
+    #    init_state=ArticulationCfg.InitialStateCfg(
+    #        pos=[0.0, 0.0, 0.05],  # posición inicial
+    #        rot=[1, 0, 0, 0],
+    #        joint_pos={"RevoluteJoint": 0.0},
+    #        joint_vel ={"RevoluteJoint": 0.0},
+    #    ),
+    #    spawn=UsdFileCfg(
+    #        usd_path="/home/ubuntu/Robots_For_Humanity/unitree_sim_isaaclab/tasks/common_scene/valvula/new_valvula.usd",
+    #        scale=[0.02, 0.02, 0.02],
+    #        mass_props=sim_utils.MassPropertiesCfg(
+    #            mass=0.5,                  # masa de la rueda
+    #        ),
+    #        collision_props=sim_utils.CollisionPropertiesCfg(),
+    #        rigid_props=sim_utils.RigidBodyPropertiesCfg(),
+    #    ),
+    #    actuators={
+    #    'valvula': ImplicitActuatorCfg(
+    #        joint_names_expr=['RevoluteJoint'],  # todos los joints de la articulación
+    #        effort_limit=None,
+    #        velocity_limit=None,
+    #        stiffness={'RevoluteJoint': 0.0},
+    #        damping={'RevoluteJoint': 0.0},
+    #        #armature={'RevoluteJoint': 0.0},
+    #    )
+    # }
+    #)
 
 
     light = AssetBaseCfg(
