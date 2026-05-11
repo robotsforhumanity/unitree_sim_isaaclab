@@ -13,12 +13,14 @@ class DDSActionProvider(ActionProvider):
         self.enable_gripper = args_cli.enable_dex1_dds
         self.enable_dex3 = args_cli.enable_dex3_dds
         self.enable_inspire = args_cli.enable_inspire_dds
+        self.enable_brainco = getattr(args_cli, 'enable_brainco_dds', False)
         self.env = env
         # Initialize DDS communication
         self.robot_dds = None
         self.gripper_dds = None
         self.dex3_dds = None
         self.inspire_dds = None
+        self.brainco_dds = None
         self._setup_dds()
         self._setup_joint_mapping()
     
@@ -36,6 +38,8 @@ class DDSActionProvider(ActionProvider):
                 self.dex3_dds = dds_manager.get_object("dex3")
             elif self.enable_inspire:
                 self.inspire_dds = dds_manager.get_object("inspire")
+            elif self.enable_brainco:
+                self.brainco_dds = dds_manager.get_object("brainco")
             print(f"[{self.name}] DDS communication initialized")
         except Exception as e:
             print(f"[{self.name}] DDS initialization failed: {e}")
@@ -143,6 +147,34 @@ class DDSActionProvider(ActionProvider):
                 "R_thumb_intermediate_joint":[4,1.5],
                 "R_thumb_distal_joint":[4,2.4],
             }
+        if self.enable_brainco:
+            self.brainco_hand_joint_mapping = {
+                "right_pinky_proximal_joint":0,
+                "right_ring_proximal_joint":1,
+                "right_middle_proximal_joint":2,
+                "right_index_proximal_joint":3,
+                "right_thumb_proximal_joint":4,
+                "right_thumb_metacarpal_joint":5,
+                "left_pinky_proximal_joint":6,
+                "left_ring_proximal_joint":7,
+                "left_middle_proximal_joint":8,
+                "left_index_proximal_joint":9,
+                "left_thumb_proximal_joint":10,
+                "left_thumb_metacarpal_joint":11,
+            }
+            self.brainco_special_joint_mapping = {
+                "left_index_distal_joint":[9,1],
+                "left_middle_distal_joint":[8,1],
+                "left_pinky_distal_joint":[6,1],
+                "left_ring_distal_joint":[7,1],
+                "left_thumb_distal_joint":[10,1.5],
+
+                "right_index_distal_joint":[3,1],
+                "right_middle_distal_joint":[2,1],
+                "right_pinky_distal_joint":[0,1],
+                "right_ring_distal_joint":[1,1],
+                "right_thumb_distal_joint":[4,1.5],
+            }
 
         
         # precompute indices (for vectorization)
@@ -161,6 +193,12 @@ class DDSActionProvider(ActionProvider):
             self._inspire_special_target_indices = [self.joint_to_index[name] for name in self.special_joint_mapping.keys()]
             self._inspire_special_source_indices = [spec[0] for spec in self.special_joint_mapping.values()]
             self._inspire_special_scales = torch.tensor([spec[1] for spec in self.special_joint_mapping.values()], dtype=torch.float32)
+        if self.enable_brainco:
+            self._brainco_target_indices = [self.joint_to_index[name] for name in self.brainco_hand_joint_mapping.keys()]
+            self._brainco_source_indices = [idx for idx in self.brainco_hand_joint_mapping.values()]
+            self._brainco_special_target_indices = [self.joint_to_index[name] for name in self.brainco_special_joint_mapping.keys()]
+            self._brainco_special_source_indices = [spec[0] for spec in self.brainco_special_joint_mapping.values()]
+            self._brainco_special_scales = torch.tensor([spec[1] for spec in self.brainco_special_joint_mapping.values()], dtype=torch.float32)
         
         device = self.env.device
         self._arm_target_idx_t = torch.tensor(self._arm_target_indices, dtype=torch.long, device=device)
@@ -179,6 +217,12 @@ class DDSActionProvider(ActionProvider):
             self._inspire_special_target_idx_t = torch.tensor(self._inspire_special_target_indices, dtype=torch.long, device=device)
             self._inspire_special_source_idx_t = torch.tensor(self._inspire_special_source_indices, dtype=torch.long, device=device)
             self._inspire_special_scales_t = self._inspire_special_scales.to(device)
+        if self.enable_brainco:
+            self._brainco_target_idx_t = torch.tensor(self._brainco_target_indices, dtype=torch.long, device=device)
+            self._brainco_source_idx_t = torch.tensor(self._brainco_source_indices, dtype=torch.long, device=device)
+            self._brainco_special_target_idx_t = torch.tensor(self._brainco_special_target_indices, dtype=torch.long, device=device)
+            self._brainco_special_source_idx_t = torch.tensor(self._brainco_special_source_indices, dtype=torch.long, device=device)
+            self._brainco_special_scales_t = self._brainco_special_scales.to(device)
         
         self._full_action_buf = torch.zeros(len(self.all_joint_names), device=device, dtype=torch.float32)
         self._positions_buf = torch.empty(29, device=device, dtype=torch.float32)
@@ -189,6 +233,8 @@ class DDSActionProvider(ActionProvider):
             self._right_hand_buf = torch.empty(len(self._right_hand_source_indices), device=device, dtype=torch.float32)
         if self.enable_inspire:
             self._inspire_buf = torch.empty(12, device=device, dtype=torch.float32)
+        if self.enable_brainco:
+            self._brainco_buf = torch.empty(12, device=device, dtype=torch.float32)
     
     def get_action(self, env) -> Optional[torch.Tensor]:
         """Get action from DDS"""
@@ -251,6 +297,16 @@ class DDSActionProvider(ActionProvider):
                             full_action.index_copy_(0, self._inspire_target_idx_t, base_vals)
                             special_vals = self._inspire_buf.index_select(0, self._inspire_special_source_idx_t) * self._inspire_special_scales_t
                             full_action.index_copy_(0, self._inspire_special_target_idx_t, special_vals)
+            elif self.brainco_dds:
+                brainco_cmds = self.brainco_dds.get_brainco_hand_command()
+                if brainco_cmds and 'positions' in brainco_cmds:
+                    brainco_cmds_positions = brainco_cmds['positions']
+                    if len(brainco_cmds_positions) >= 12:
+                        self._brainco_buf.copy_(torch.tensor(brainco_cmds_positions[:12], dtype=torch.float32, device=self.env.device))
+                        base_vals = self._brainco_buf.index_select(0, self._brainco_source_idx_t)
+                        full_action.index_copy_(0, self._brainco_target_idx_t, base_vals)
+                        special_vals = self._brainco_buf.index_select(0, self._brainco_special_source_idx_t) * self._brainco_special_scales_t
+                        full_action.index_copy_(0, self._brainco_special_target_idx_t, special_vals)
             return full_action.unsqueeze(0)
             
         except Exception as e:
@@ -275,5 +331,7 @@ class DDSActionProvider(ActionProvider):
                 self.dex3_dds.stop_communication()
             if self.inspire_dds:
                 self.inspire_dds.stop_communication()
+            if self.brainco_dds:
+                self.brainco_dds.stop_communication()
         except Exception as e:
             print(f"[{self.name}] Clean up DDS resources failed: {e}")

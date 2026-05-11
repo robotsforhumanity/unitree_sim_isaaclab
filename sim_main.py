@@ -17,6 +17,9 @@ import torch
 import gymnasium as gym
 from pathlib import Path
 
+# Use local teleimager (with IsaacSim support) instead of the installed package
+sys.path.insert(0, os.path.join(project_root, "teleimager", "src"))
+
 # Isaac Lab AppLauncher
 from isaaclab.app import AppLauncher
 
@@ -34,6 +37,7 @@ parser.add_argument("--robot_type", type=str, default="g129", help="robot type")
 parser.add_argument("--enable_dex1_dds", action="store_true", help="enable gripper DDS")
 parser.add_argument("--enable_dex3_dds", action="store_true", help="enable dexterous hand DDS")
 parser.add_argument("--enable_inspire_dds", action="store_true", help="enable inspire hand DDS")
+parser.add_argument("--enable_brainco_dds", action="store_true", help="enable BrainCo hand DDS")
 parser.add_argument("--stats_interval", type=float, default=10.0, help="statistics print interval (seconds)")
 
 parser.add_argument("--file_path", type=str, default="/home/unitree/Code/xr_teleoperate/teleop/utils/data", help="file path (when action_source=file)")
@@ -85,8 +89,9 @@ if args_cli.no_render:
 else:
     os.environ["LIVESTREAM"] = "0"
 
-if args_cli.enable_dex3_dds and args_cli.enable_dex1_dds and args_cli.enable_inspire_dds:
-    print("Error: enable_dex3_dds and enable_dex1_dds and enable_inspire_dds cannot be enabled at the same time")
+hand_dds_flags = [args_cli.enable_dex3_dds, args_cli.enable_dex1_dds, args_cli.enable_inspire_dds, args_cli.enable_brainco_dds]
+if sum(hand_dds_flags) > 1:
+    print("Error: only one hand DDS can be enabled at a time (dex1, dex3, inspire, brainco)")
     print("Please select one of the options")
     sys.exit(1)
 
@@ -674,6 +679,8 @@ if __name__ == "__main__":
 # python sim_main.py --device cpu  --enable_cameras  --task Isaac-Move-Cylinder-G129-Dex3-Wholebody  --robot_type g129 --enable_dex3_dds 
 # python sim_main.py --device cpu  --enable_cameras  --task Isaac-Move-Cylinder-G129-Inspire-Wholebody  --robot_type g129 --enable_inspire_dds 
 
+
+# python sim_main.py --device cpu  --enable_cameras  --task Isaac-PickPlace-Pitcher-G129-Brainco-Joint  --enable_brainco_dds --robot_type g129
 
 # python sim_main.py --device cpu  --enable_cameras  --task Isaac-PickPlace-Cylinder-H12-27dof-Inspire-Joint  --enable_inspire_dds --robot_type h1_2
 # python sim_main.py --device cpu  --enable_cameras  --task Isaac-PickPlace-RedBlock-H12-27dof-Inspire-Joint  --enable_inspire_dds --robot_type h1_2
