@@ -26,31 +26,10 @@ class TableCylinderSceneCfgWH(InteractiveSceneCfg): # inherit from the interacti
             rot=[1.0, 0.0, 0.0, 0.0]
         ),
         spawn=UsdFileCfg(
-            usd_path=f"{project_root}/assets/objects/small_warehouse/small_warehouse_digital_twin.usd",
+            usd_path="/home/ubuntu/ypf/YPF_warehouse.usdz",
         ),
     )
 
-
-        # 1. table configuration
-    packing_table1 = AssetBaseCfg(
-        prim_path="/World/envs/env_.*/PackingTable_1",    # table in the scene
-        init_state=AssetBaseCfg.InitialStateCfg(pos=[-2.35644,-3.45572,-0.2],   # initial position [x, y, z]
-                                                rot=[0.70091, 0.0, 0.0, 0.71325]), # initial rotation [x, y, z, w]
-        spawn=UsdFileCfg(
-            usd_path=f"{project_root}/assets/objects/PackingTable_2/PackingTable.usd",    # table model file
-            rigid_props=sim_utils.RigidBodyPropertiesCfg(kinematic_enabled=True),    # set to kinematic object
-        ),
-    )
-
-    packing_table2 = AssetBaseCfg(
-        prim_path="/World/envs/env_.*/PackingTable_2",    # table in the scene
-        init_state=AssetBaseCfg.InitialStateCfg(pos=[-3.97225,-4.3424,-0.2],   # initial position [x, y, z]
-                                                rot=[1.0, 0.0, 0.0, 0.0]), # initial rotation [x, y, z, w]
-        spawn=UsdFileCfg(
-            usd_path=f"{project_root}/assets/objects/PackingTable/PackingTable.usd",    # table model file
-            rigid_props=sim_utils.RigidBodyPropertiesCfg(kinematic_enabled=True),    # set to kinematic object
-        ),
-    )
     # # Object
     # 2. object configuration (cylinder)     
     object = RigidObjectCfg(
