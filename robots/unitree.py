@@ -2,6 +2,7 @@
 # License: Apache License, Version 2.0  
 """Configuration for Unitree robots."""
 
+from tkinter import Scale
 import isaaclab.sim as sim_utils
 from isaaclab.actuators import ActuatorNetMLPCfg, DCMotorCfg, ImplicitActuatorCfg
 from isaaclab.assets.articulation import ArticulationCfg
@@ -1102,13 +1103,10 @@ G129_CFG_WITH_INSPIRE_WHOLEBODY = ArticulationCfg(
 )
 
 
-
-
-
-
 G129_CFG_WITH_BRAINCO_HAND = ArticulationCfg(
     spawn=sim_utils.UsdFileCfg(
         usd_path=f"{project_root}/assets/robots/g1-29dof_brainco/g1_with_brainco_hands.usd",
+        scale=(0.5, 0.5, 0.5),
         activate_contact_sensors=True,
         rigid_props=sim_utils.RigidBodyPropertiesCfg(
             disable_gravity=False,
@@ -1122,7 +1120,7 @@ G129_CFG_WITH_BRAINCO_HAND = ArticulationCfg(
         articulation_props=sim_utils.ArticulationRootPropertiesCfg(
             enabled_self_collisions=False,
             solver_position_iteration_count=8,
-            solver_velocity_iteration_count=4
+            solver_velocity_iteration_count=4,
         ),
     ),
     init_state=ArticulationCfg.InitialStateCfg(

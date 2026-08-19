@@ -41,12 +41,31 @@ unzip -q assets.zip
 if [ -d "assets" ]; then
     # 检查父目录（..）是否已经存在 assets 文件夹，存在则删除
     if [ -d "../assets" ]; then
+        # Preserve custom (non-upstream) assets before wiping, e.g. BrainCo robot
+        CUSTOM_ASSETS=("robots/g1-29dof_brainco")
+        BACKUP_DIR="../.custom_assets_backup"
+        rm -rf "$BACKUP_DIR"
+        for item in "${CUSTOM_ASSETS[@]}"; do
+            if [ -e "../assets/$item" ]; then
+                echo "Backing up custom asset: $item"
+                mkdir -p "$BACKUP_DIR/$(dirname "$item")"
+                cp -r "../assets/$item" "$BACKUP_DIR/$item"
+            fi
+        done
+
         echo "Cleaning up existing '../assets' folder..."
         rm -rf "../assets"
     fi
 
     echo "Moving new assets to parent directory..."
     mv assets ../
+
+    # Restore custom assets preserved earlier
+    if [ -d "../.custom_assets_backup" ]; then
+        echo "Restoring custom assets..."
+        cp -r ../.custom_assets_backup/* ../assets/
+        rm -rf "../.custom_assets_backup"
+    fi
 else
     echo "Error: assets unzip failed or folder does not exist"
     exit 1

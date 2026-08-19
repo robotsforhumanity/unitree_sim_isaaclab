@@ -309,8 +309,8 @@ class G1RobotPresets:
             base_config=G129_CFG_WITH_INSPIRE_HAND
         )
     @classmethod
-    def g1_29dof_brainco_base_fix(cls, init_pos: Tuple[float, float, float] = (-0.15, 0.0, 0.76),
-        init_rot: Tuple[float, float, float, float] = (0.7071, 0, 0, 0.7071)) -> ArticulationCfg:
+    def g1_29dof_brainco_base_fix(cls, init_pos: Tuple[float, float, float] = (0.21, -1.81, 0.76),
+        init_rot: Tuple[float, float, float, float] = (0.31709, 0, 0, -0.9484)) -> ArticulationCfg:
         """pick-place task configuration - BrainCo hand"""
         return RobotBaseCfg.get_base_config(
             init_pos=init_pos,

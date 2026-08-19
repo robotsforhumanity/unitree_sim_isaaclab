@@ -5,14 +5,32 @@ public base scene configuration module
 provides reusable scene element configurations, such as tables, objects, ground, lights, etc.
 """
 import isaaclab.sim as sim_utils
-from isaaclab.assets import  AssetBaseCfg, RigidObjectCfg
+from isaaclab.assets import AssetBaseCfg, DeformableObjectCfg, RigidObjectCfg
 from isaaclab.scene import InteractiveSceneCfg
 from isaaclab.sim.spawners.from_files.from_files_cfg import GroundPlaneCfg, UsdFileCfg
 from isaaclab.utils import configclass
-from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR
 from tasks.common_config import   CameraBaseCfg  # isort: skip
 import os
 project_root = os.environ.get("PROJECT_ROOT")
+
+# NuRec warehouse is COLMAP Y-down; Isaac world is Z-up. Rotate -90 deg about X
+# so the reconstructed floor (local y ≈ 0.50 m) becomes world z = 0.
+# If the scene looks upside down, swap to +90 deg: rot = [0.70710678, 0.70710678, 0.0, 0.0]
+YPF_WAREHOUSE_USDZ = "/home/fran/ypf/YPF_warehouse.usdz"
+YPF_MALEMUCO_USDZ = (
+    "/home/fran/ypf/Mameluco_V4_YPF_physics_isaacsim/"
+    "Mameluco_V4_YPF_physics_isaacsim/MamelucoYPF_physics.usd"
+)
+YPF_WAREHOUSE_POS = [0.0, 0.0, 0.50]
+YPF_WAREHOUSE_ROT = [0.70710678, -0.70710678, 0.0, 0.0]  # (w, x, y, z)
+
+# Spawn inside the reconstructed warehouse. The robot pose is NOT in this file's
+# assets — each task must pass YPF_ROBOT_POS to its G1/H12 preset (see env cfgs).
+# G1 spawn z is ~0.76 at scale 1. Robot USD is currently scale 0.5, so pelvis ~0.40.
+YPF_ROBOT_POS = (0.45, -2.70, 0.42)
+YPF_ROBOT_ROT = (0.7071, 0.0, 0.0, 0.7071)  # facing +Y, toward the cylinder
+YPF_OBJECT_POS = [0.45, -2.00, 0.15]
+
 @configclass
 class TableCylinderSceneCfg(InteractiveSceneCfg): # inherit from the interactive scene configuration class
     """object table scene configuration class
@@ -22,78 +40,21 @@ class TableCylinderSceneCfg(InteractiveSceneCfg): # inherit from the interactive
     room_walls = AssetBaseCfg(
         prim_path="/World/envs/env_.*/Room",
         init_state=AssetBaseCfg.InitialStateCfg(
-            pos=[0.0, 0.0, 0],  # 房间中心点
-            rot=[1.0, 0.0, 0.0, 0.0]
+            pos=YPF_WAREHOUSE_POS,
+            rot=YPF_WAREHOUSE_ROT,
         ),
         spawn=UsdFileCfg(
-            usd_path=f"{ISAAC_NUCLEUS_DIR}/Environments/Simple_Warehouse/warehouse.usd",  # use simple room model
-        ),
-    )
-    # print(f"ISAAC_NUCLEUS_DIR: {ISAAC_NUCLEUS_DIR}")
-    #ISAAC_NUCLEUS_DIR: http://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/4.5/Isaac
-        # 1. table configuration
-    packing_table = AssetBaseCfg(
-        prim_path="/World/envs/env_.*/PackingTable",    # table in the scene
-        init_state=AssetBaseCfg.InitialStateCfg(pos=[0.0, 0.55, -0.2],   # initial position [x, y, z]
-                                                rot=[1.0, 0.0, 0.0, 0.0]), # initial rotation [x, y, z, w]
-        spawn=UsdFileCfg(
-            # usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/PackingTable/packing_table.usd",    # table model file
-            usd_path=f"{project_root}/assets/objects/PackingTable/PackingTable.usd",    # table model file
-            rigid_props=sim_utils.RigidBodyPropertiesCfg(kinematic_enabled=True),    # set to kinematic object
-        ),
-    )
-
-    packing_table_2 = AssetBaseCfg(
-        prim_path="/World/envs/env_.*/PackingTable_2",   
-        init_state=AssetBaseCfg.InitialStateCfg(pos=[-3.5, 0.55, -0.2],  
-                                                rot=[1.0, 0.0, 0.0, 0.0]), 
-        spawn=UsdFileCfg(
-            usd_path=f"{project_root}/assets/objects/PackingTable/PackingTable.usd",    # table model file
-            rigid_props=sim_utils.RigidBodyPropertiesCfg(kinematic_enabled=True),   
-        ),
-    )
-    packing_table_3 = AssetBaseCfg(
-        prim_path="/World/envs/env_.*/PackingTable_3",   
-        init_state=AssetBaseCfg.InitialStateCfg(pos=[3.5, 0.55, -0.2],  
-                                                rot=[1.0, 0.0, 0.0, 0.0]), 
-        spawn=UsdFileCfg(
-            usd_path=f"{project_root}/assets/objects/PackingTable/PackingTable.usd",    # table model file
-            rigid_props=sim_utils.RigidBodyPropertiesCfg(kinematic_enabled=True),   
-        ),
-    )
-    packing_table_4 = AssetBaseCfg(
-        prim_path="/World/envs/env_.*/PackingTable_4",   
-        init_state=AssetBaseCfg.InitialStateCfg(pos=[3.5, -5, -0.2],  
-                                                rot=[1.0, 0.0, 0.0, 0.0]), 
-        spawn=UsdFileCfg(
-            usd_path=f"{project_root}/assets/objects/PackingTable/PackingTable.usd",    # table model file
-            rigid_props=sim_utils.RigidBodyPropertiesCfg(kinematic_enabled=True),   
-        ),
-    )
-    packing_table_5 = AssetBaseCfg(
-        prim_path="/World/envs/env_.*/PackingTable_5",   
-        init_state=AssetBaseCfg.InitialStateCfg(pos=[-3.5, -5, -0.2],  
-                                                rot=[1.0, 0.0, 0.0, 0.0]), 
-        spawn=UsdFileCfg(
-            usd_path=f"{project_root}/assets/objects/PackingTable/PackingTable.usd",    # table model file
-            rigid_props=sim_utils.RigidBodyPropertiesCfg(kinematic_enabled=True),   
-        ),
-    )
-    packing_table_6 = AssetBaseCfg(
-        prim_path="/World/envs/env_.*/PackingTable_6",   
-        init_state=AssetBaseCfg.InitialStateCfg(pos=[0.0, -5, -0.2],  
-                                                rot=[1.0, 0.0, 0.0, 0.0]), 
-        spawn=UsdFileCfg(
-            usd_path=f"{project_root}/assets/objects/PackingTable/PackingTable.usd",    # table model file
-            rigid_props=sim_utils.RigidBodyPropertiesCfg(kinematic_enabled=True),   
+            usd_path=YPF_WAREHOUSE_USDZ,
         ),
     )
     # Object
     # 2. object configuration (cylinder)     
     object = RigidObjectCfg(
         prim_path="/World/envs/env_.*/Object",    # object in the scene
-        init_state=RigidObjectCfg.InitialStateCfg(pos=[-0.35, 0.40, 0.84], # initial position (pos) 
-                                                  rot=[1, 0, 0, 0]), # initial rotation (rot)
+        init_state=RigidObjectCfg.InitialStateCfg(
+            pos=[YPF_OBJECT_POS[0] + 0.6, YPF_OBJECT_POS[1], 0.35],
+            rot=[1, 0, 0, 0],
+        ),
         spawn=sim_utils.CylinderCfg(
             radius=0.018,    # cylinder radius (radius)
             height=0.35,     # cylinder height (height)
@@ -112,12 +73,22 @@ class TableCylinderSceneCfg(InteractiveSceneCfg): # inherit from the interactive
             ),
         ),
     )
-    # Ground plane
-    # 3. ground configuration
-    # ground = AssetBaseCfg(
-    #     prim_path="/World/GroundPlane",    # ground in the scene
-    #     spawn=GroundPlaneCfg( ),    # ground configuration
-    # )
+
+    # Isaac Sim export with PhysxDeformableBodyAPI (nylon bag, ~1 kg). Keep the
+    # USD physics as-is; do not wrap it in a rigid cuboid.
+    mameluco = DeformableObjectCfg(
+        prim_path="/World/envs/env_.*/mameluco",
+        init_state=DeformableObjectCfg.InitialStateCfg(pos=YPF_OBJECT_POS, rot=[1, 0, 0, 0]),
+        spawn=UsdFileCfg(
+            usd_path=YPF_MALEMUCO_USDZ,
+        ),
+    )
+    # Ground plane at world z = 0. Visual grid kept (color=None) so it is
+    # obvious whether the digital-twin floor is coplanar with the world.
+    ground = AssetBaseCfg(
+        prim_path="/World/GroundPlane",
+        spawn=GroundPlaneCfg(color=None, size=(100.0, 100.0)),
+    )
 
     # Lights
     # 4. light configuration
@@ -128,6 +99,6 @@ class TableCylinderSceneCfg(InteractiveSceneCfg): # inherit from the interactive
     )
 
     world_camera = CameraBaseCfg.get_camera_config(prim_path="/World/PerspectiveCamera",
-                                                    pos_offset=(-0.1, 3.6, 1.6),
+                                                    pos_offset=(0.45, 0.90, 1.6),
                                                     rot_offset=( -0.00617,0.00617, 0.70708, -0.70708),
                                                     focal_length = 16.5)

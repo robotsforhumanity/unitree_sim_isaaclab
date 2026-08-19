@@ -9,10 +9,15 @@ from isaaclab.assets import  AssetBaseCfg, RigidObjectCfg
 from isaaclab.scene import InteractiveSceneCfg
 from isaaclab.sim.spawners.from_files.from_files_cfg import GroundPlaneCfg, UsdFileCfg
 from isaaclab.utils import configclass
-from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR
 from tasks.common_config import   CameraBaseCfg  # isort: skip
 import os
 project_root = os.environ.get("PROJECT_ROOT")
+
+# Same NuRec warehouse as TableCylinderSceneCfg: COLMAP Y-down -> Isaac Z-up.
+YPF_WAREHOUSE_USDZ = "/home/ubuntu/ypf/YPF_warehouse.usdz"
+YPF_WAREHOUSE_POS = [0.0, 0.0, 0.50]
+YPF_WAREHOUSE_ROT = [0.70710678, -0.70710678, 0.0, 0.0]  # (w, x, y, z) -90 deg about X
+
 @configclass
 class TableCylinderSceneCfgWH(InteractiveSceneCfg): # inherit from the interactive scene configuration class
     """object table scene configuration class
@@ -22,11 +27,11 @@ class TableCylinderSceneCfgWH(InteractiveSceneCfg): # inherit from the interacti
     room_walls = AssetBaseCfg(
         prim_path="/World/envs/env_.*/Room",
         init_state=AssetBaseCfg.InitialStateCfg(
-            pos=[0.0, 0.0, 0],  # room center point
-            rot=[1.0, 0.0, 0.0, 0.0]
+            pos=YPF_WAREHOUSE_POS,
+            rot=YPF_WAREHOUSE_ROT,
         ),
         spawn=UsdFileCfg(
-            usd_path="/home/ubuntu/ypf/YPF_warehouse.usdz",
+            usd_path=YPF_WAREHOUSE_USDZ,
         ),
     )
 
@@ -54,8 +59,11 @@ class TableCylinderSceneCfgWH(InteractiveSceneCfg): # inherit from the interacti
             ),
         ),
     )
-    # Ground plane
-
+    # Ground plane at world z = 0, coplanar with the lifted digital-twin floor.
+    ground = AssetBaseCfg(
+        prim_path="/World/GroundPlane",
+        spawn=GroundPlaneCfg(color=None, size=(100.0, 100.0)),
+    )
 
     # Lights
     # 4. light configuration

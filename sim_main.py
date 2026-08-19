@@ -95,6 +95,14 @@ if sum(hand_dds_flags) > 1:
     print("Please select one of the options")
     sys.exit(1)
 
+# PhysX deformable bodies (FEM coverall) only work with GPU dynamics. AppLauncher
+# must start on CUDA; flipping sim.device later is too late if Isaac launched on CPU.
+if "PickPlace-Pitcher" in str(args_cli.task) and str(getattr(args_cli, "device", "")).startswith("cpu"):
+    print(
+        f"[sim] task {args_cli.task} uses a PhysX deformable body; "
+        "overriding --device cpu to cuda:0 (GPU dynamics is required)."
+    )
+    args_cli.device = "cuda:0"
 
 import pinocchio                 
 app_launcher = AppLauncher(args_cli)
@@ -680,7 +688,7 @@ if __name__ == "__main__":
 # python sim_main.py --device cpu  --enable_cameras  --task Isaac-Move-Cylinder-G129-Inspire-Wholebody  --robot_type g129 --enable_inspire_dds 
 
 
-# python sim_main.py --device cpu  --enable_cameras  --task Isaac-PickPlace-Pitcher-G129-Brainco-Joint  --enable_brainco_dds --robot_type g129
+# python sim_main.py --device cuda:0 --rendering_mode performance --enable_cameras --task Isaac-PickPlace-Pitcher-G129-Brainco-Joint --enable_brainco_dds --robot_type g129
 
 # python sim_main.py --device cpu  --enable_cameras  --task Isaac-PickPlace-Cylinder-H12-27dof-Inspire-Joint  --enable_inspire_dds --robot_type h1_2
 # python sim_main.py --device cpu  --enable_cameras  --task Isaac-PickPlace-RedBlock-H12-27dof-Inspire-Joint  --enable_inspire_dds --robot_type h1_2
